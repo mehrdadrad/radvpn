@@ -6,6 +6,9 @@ import (
 	"os/exec"
 	"context"
 	"time"
+	"flag"
+
+	"github.com/mehrdadrad/radvpn/udp"
 
 	"github.com/songgao/water"
 )
@@ -13,7 +16,7 @@ import (
 type Server struct{}
 
 // CreateTAPIfce  creates TAP interface
-func(s Server) CreateTAPIfce() (*water.Interface, error) {
+func(s Server) CreateTUNInterface(ip string) (*water.Interface, error) {
 	config := water.Config{
 		DeviceType: water.TUN,
 	}
@@ -25,14 +28,14 @@ func(s Server) CreateTAPIfce() (*water.Interface, error) {
 	}
 
 	ipCmd("link", "set", "dev", config.Name, "mtu", "1300")
-	ipCmd("addr", "add", "10.10.55.1/24", "dev", config.Name )
+	ipCmd("addr", "add", ip, "dev", config.Name )
 	ipCmd("link", "set", "dev", config.Name, "up")
 
 	return ifce, nil
 }
 
 func (s Server) UDPServer() (net.PacketConn, error) {
-	return net.ListenPacket("udp", ":8055")
+	return net.ListenPacket("udp", ":8085")
 }
 
 func ipCmd(args ...string) error{
@@ -41,42 +44,25 @@ func ipCmd(args ...string) error{
 	return exec.CommandContext(ctx, "ip", args...).Run()
 }
 
+var localHost = flag.String("local", "10.0.1.1/24", "IP/Mask")
+var remoteHost = flag.String("remote", "192.168.55.10:8085", "IP:Port")
+
 func main() {
+	flag.Parse()
+
 	srv := &Server{}
-	ifce, err := srv.CreateTAPIfce()
+	tunIf, err := srv.CreateTUNInterface(*localHost)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	pConn, err := srv.UDPServer()
-	if err != nil {
-		log.Fatal(err)
+	u := udp.UDP{
+		TUNIf: tunIf,
+		RemoteHost: *remoteHost,
 	}
 
-	go func() {
-		buff := make([]byte, 1024)	
-		for {
-			n, _, err := pConn.ReadFrom(buff)	
-			if err != nil {
-				continue
-			}
-
-			ifce.Write(buff[:n])
-		}
-	}()
-
-	go func() {
-		buff := make([]byte, 1024)
-		rAddress, _ := net.ResolveUDPAddr("udp", "192.168.55.10:8085")
-		for { 
-			n, err := ifce.Read(buff)
-			if err != nil {
-				continue
-			}
-
-			pConn.WriteTo(buff[:n], rAddress)
-		}
-	}()
+	u.Run()
+	
 
 	select{}
 }
