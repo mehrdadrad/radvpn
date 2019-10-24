@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	_"io"
 	"log"
 	"math/big"
 	"time"
@@ -63,8 +62,6 @@ func (q QUIC) Run() {
 			stream.Close()
 			session.Close()
 			listener.Close()
-
-			log.Println("DONE from remote to tun")
 		}
 	}()
 
@@ -93,7 +90,6 @@ func (q QUIC) Run() {
 		}()
 
 		for {
-			log.Println("start from tun to if")
 			conn, err := net.ListenPacket("udp", ":0")
 			if err != nil {
 				log.Fatal(err)
