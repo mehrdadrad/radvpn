@@ -8,7 +8,7 @@ import (
 	"time"
 	"flag"
 
-	_ "github.com/mehrdadrad/radvpn/udp"
+	"github.com/mehrdadrad/radvpn/udp"
 	"github.com/mehrdadrad/radvpn/quic"
 
 	"github.com/songgao/water"
@@ -47,6 +47,7 @@ func ipCmd(args ...string) error{
 
 var localHost = flag.String("local", "10.0.1.1/24", "IP/Mask")
 var remoteHost = flag.String("remote", "192.168.55.10:8085", "IP:Port")
+var protoType = flag.String("proto", "udp", "udp or quic")
 
 func main() {
 	flag.Parse()
@@ -57,21 +58,24 @@ func main() {
 		log.Fatal(err)
 	}
 
-	/*
-	u := udp.UDP{
-		TUNIf: tunIf,
-		RemoteHost: *remoteHost,
-	}
+	switch *protoType {
+		case "udp":
+			u := udp.UDP{
+				TUNIf: tunIf,
+				RemoteHost: *remoteHost,
+			}
 
-	u.Run()
-	*/
-	
-	q := quic.QUIC{
-		TUNIf: tunIf,
-		RemoteHost: *remoteHost,
-	}
+			u.Run()
+		case "quic":	
+			q := quic.QUIC{
+				TUNIf: tunIf,
+				RemoteHost: *remoteHost,
+			}
 
-	q.Run()
+			q.Run()
+		default:
+			log.Println("not support!")	
+	}
 
 	select{}
 }

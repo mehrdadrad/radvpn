@@ -7,16 +7,17 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"io"
+	_"io"
 	"log"
 	"math/big"
 	"time"
+	"net"
 
 	quicgo "github.com/lucas-clemente/quic-go"
 	"github.com/songgao/water"
 )
 
-const buffMaxSize = 1300
+const buffMaxSize = 1518 
 
 type QUIC struct {
 	TUNIf      *water.Interface
@@ -31,6 +32,7 @@ func (q QUIC) Run() {
 			IdleTimeout: 2 * time.Second,
 			KeepAlive:   true,
 		}
+		buff := make([]byte, buffMaxSize)
 		for {
 			listener, err := quicgo.ListenAddr(":8085", generateTLSConfig(), config)
 			if err != nil {
@@ -48,7 +50,15 @@ func (q QUIC) Run() {
 				log.Fatal(err)
 			}
 
-			io.Copy(q.TUNIf, stream)
+			for {
+				n, err := stream.Read(buff)
+				if err != nil {
+					log.Println(err)
+					break	
+				}
+
+				q.TUNIf.Write(buff[:n])
+			}
 
 			stream.Close()
 			session.Close()
@@ -60,21 +70,36 @@ func (q QUIC) Run() {
 
 	// from tun interface to remote
 	go func() {
-		buff := make([]byte, buffMaxSize)
 		tlsConf := &tls.Config{
 			InsecureSkipVerify: true,
 			NextProtos:         []string{"radvpn"},
 		}
+
 		config := &quicgo.Config{
-			HandshakeTimeout : 2 * time.Second,
 			IdleTimeout: 2 * time.Second,
 			KeepAlive:   true,
 		}
 
+		rAddress, _ := net.ResolveUDPAddr("udp", q.RemoteHost)
+
+		tunChan := make(chan []byte, 1000)
+
+		go func(){
+			buff := make([]byte, buffMaxSize)
+			for {
+				n, _ := q.TUNIf.Read(buff)
+				tunChan <- buff[:n]
+			}	
+		}()
+
 		for {
 			log.Println("start from tun to if")
-		
-			session, err := quicgo.DialAddr(q.RemoteHost, tlsConf, config)
+			conn, err := net.ListenPacket("udp", ":0")
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			session, err := quicgo.Dial(conn, rAddress, q.RemoteHost, tlsConf, config)
 			if err != nil {
 				log.Println("dial", err)
 				continue
@@ -86,12 +111,7 @@ func (q QUIC) Run() {
 			}
 
 			for {
-				n, err := q.TUNIf.Read(buff)
-				if err != nil {
-					continue
-				}
-
-				_, err = stream.Write([]byte(buff[:n]))
+				_, err = stream.Write([]byte(<-tunChan))
 				if err != nil {
 					log.Println("stream", err)
 					break
@@ -100,6 +120,7 @@ func (q QUIC) Run() {
 
 			stream.Close()
 			session.Close()
+			conn.Close()
 		}
 	}()
 }
