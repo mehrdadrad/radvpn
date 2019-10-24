@@ -8,7 +8,8 @@ import (
 	"time"
 	"flag"
 
-	"github.com/mehrdadrad/radvpn/udp"
+	_ "github.com/mehrdadrad/radvpn/udp"
+	"github.com/mehrdadrad/radvpn/quic"
 
 	"github.com/songgao/water"
 )
@@ -56,13 +57,21 @@ func main() {
 		log.Fatal(err)
 	}
 
+	/*
 	u := udp.UDP{
 		TUNIf: tunIf,
 		RemoteHost: *remoteHost,
 	}
 
 	u.Run()
+	*/
 	
+	q := quic.QUIC{
+		TUNIf: tunIf,
+		RemoteHost: *remoteHost,
+	}
+
+	q.Run()
 
 	select{}
 }
