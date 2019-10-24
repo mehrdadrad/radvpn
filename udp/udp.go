@@ -12,6 +12,8 @@ import(
 	"github.com/songgao/water"
 )
 
+const buffMaxSize = 1518 
+
 type UDP struct {
 	conn	   net.PacketConn
 	TUNIf	   *water.Interface
@@ -38,22 +40,21 @@ func (u UDP) Run() {
 
 	// from remote to tun interface
 	go func() {
-		buff := make([]byte, 1024)	
+		buff := make([]byte, buffMaxSize)	
 		for {
-			n, addr, err := u.conn.ReadFrom(buff)	
+			n, _, err := u.conn.ReadFrom(buff)	
 			if err != nil {
 				log.Println(err)
 				continue
 			}
 
-			log.Println("packet rcvd from", addr)
 			u.TUNIf.Write(decrypt(buff[:n], passphrase))
 		}
 	}()
 
 	// from tun interface to remote
 	go func() {
-		buff := make([]byte, 1024)
+		buff := make([]byte, buffMaxSize)
 		rAddress, _ := net.ResolveUDPAddr("udp", u.RemoteHost)
 		for {
 			n, err := u.TUNIf.Read(buff)
@@ -61,7 +62,6 @@ func (u UDP) Run() {
 				continue
 			}
 
-			log.Println("packet rcvd from tun")
 			u.conn.WriteTo(encrypt(buff[:n], passphrase), rAddress)
 		}
 	}()
