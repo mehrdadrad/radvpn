@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"time"
 
 	"github.com/mehrdadrad/radvpn/udp"
 	"github.com/mehrdadrad/radvpn/netdev"
+	"github.com/mehrdadrad/radvpn/crypto"
 )
 
 type server interface {
@@ -18,10 +20,16 @@ func main() {
 	var srv server
 	flag.Parse()
 
+	crp := crypto.GCM{
+		Passphrase: "6368616e676520746869732070617373776f726420746f206120736563726574",
+	}
+
 	srv = &udp.UDP{
 		TUNIf:      netdev.New([]string{*localHost}, 1300),
 		RemoteHost: *remoteHost,
-		MaxThreads: 2,
+		MaxThreads: 10,
+		KeepAlive: 10 * time.Second,
+		Cipher: crp,
 	}
 
 	srv.Start()

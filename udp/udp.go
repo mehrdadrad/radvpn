@@ -2,15 +2,14 @@ package udp
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
-	"encoding/hex"
-	"io"
+
 	"log"
 	"net"
 	"sync"
 	"syscall"
+	"time"
+
+	"github.com/mehrdadrad/radvpn/crypto"
 
 	"golang.org/x/sys/unix"
 
@@ -25,8 +24,10 @@ type UDP struct {
 	TUNIf      *water.Interface
 	MaxThreads int
 	RemoteHost string
+	KeepAlive  time.Duration
+	Cipher     crypto.Cipher
 
-	bufPool    sync.Pool
+	bufPool sync.Pool
 }
 
 func (u *UDP) connect() error {
@@ -37,9 +38,9 @@ func (u *UDP) connect() error {
 			var sockoptErr error
 			err := c.Control(func(fd uintptr) {
 				sockoptErr = unix.SetsockoptInt(
-					int(fd), 
-					unix.SOL_SOCKET, 
-					unix.SO_REUSEPORT, 
+					int(fd),
+					unix.SOL_SOCKET,
+					unix.SO_REUSEPORT,
 					1,
 				)
 			})
@@ -49,6 +50,7 @@ func (u *UDP) connect() error {
 			}
 			return sockoptErr
 		},
+		KeepAlive: u.KeepAlive,
 	}
 
 	u.conn, err = lc.ListenPacket(context.Background(), "udp", ":8085")
@@ -62,7 +64,7 @@ func (u *UDP) Shutdown() {
 }
 
 // ingress gets the data
-func (u *UDP) ingress(passphrase string) {
+func (u *UDP) ingress() {
 	for {
 		b := u.bufPool.Get().([]byte)
 
@@ -72,13 +74,16 @@ func (u *UDP) ingress(passphrase string) {
 			continue
 		}
 
-		u.TUNIf.Write(decrypt(b[:n], passphrase))
-		u.bufPool.Put(b)	
+		_, err = u.TUNIf.Write(u.Cipher.Decrypt(b[:n]))
+		if err != nil {
+			log.Println(err)
+		}
+		u.bufPool.Put(b)
 	}
 }
 
 // egress sends out the data
-func (u *UDP) egress(passphrase string) {
+func (u *UDP) egress() {
 	// from tun interface to remote
 	rAddress, _ := net.ResolveUDPAddr("udp", u.RemoteHost)
 	for {
@@ -89,8 +94,11 @@ func (u *UDP) egress(passphrase string) {
 			continue
 		}
 
-		u.conn.WriteTo(encrypt(b[:n], passphrase), rAddress)
-		u.bufPool.Put(b)	
+		_, err = u.conn.WriteTo(u.Cipher.Encrypt(b[:n]), rAddress)
+		if err != nil {
+			log.Println(err)
+		}
+		u.bufPool.Put(b)
 	}
 }
 
@@ -103,62 +111,17 @@ func (u *UDP) Start() {
 	}
 
 	for i := 0; i < u.MaxThreads; i++ {
-		go u.connection()
+		go u.run()
 	}
 
 	select {}
 }
 
-func (u UDP) connection() {
+func (u UDP) run() {
 	if err := u.connect(); err != nil {
 		log.Fatal(err)
 	}
 
-	passphrase := "6368616e676520746869732070617373776f726420746f206120736563726574"
-
-	go u.ingress(passphrase)
-	go u.egress(passphrase)
-
-}
-
-func encrypt(plainData []byte, passphrase string) []byte {
-	key, _ := hex.DecodeString(passphrase)
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		log.Fatal(err)
-	}
-
-	return gcm.Seal(nonce, nonce, plainData, nil)
-}
-
-func decrypt(cipherData []byte, passphrase string) []byte {
-	key, _ := hex.DecodeString(passphrase)
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	nonceSize := gcm.NonceSize()
-	nonce, cipherData := cipherData[:nonceSize], cipherData[nonceSize:]
-	plainData, err := gcm.Open(nil, nonce, cipherData, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return plainData
+	go u.ingress()
+	go u.egress()
 }
