@@ -20,6 +20,8 @@ func (n *netdev) create() error {
 		DeviceType: water.TUN,
 	}
 
+	config.Name = "radvpn"
+
 	n.ifce, err = water.New(config)
 	if err != nil {
 		return err

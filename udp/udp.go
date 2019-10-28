@@ -1,70 +1,124 @@
 package udp
 
-import(
+import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"log"
 	"net"
-	"io"
+	"sync"
+	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/songgao/water"
 )
 
-const buffMaxSize = 1518 
+const buffMaxSize = 1518
 
+// UDP represents the udp server
 type UDP struct {
-	conn	   net.PacketConn
-	TUNIf	   *water.Interface
+	conn       net.PacketConn
+	TUNIf      *water.Interface
+	MaxThreads int
 	RemoteHost string
+
+	bufPool    sync.Pool
 }
 
 func (u *UDP) connect() error {
 	var err error
-	u.conn, err = net.ListenPacket("udp", ":8085")
+
+	lc := net.ListenConfig{
+		Control: func(network, address string, c syscall.RawConn) error {
+			var sockoptErr error
+			err := c.Control(func(fd uintptr) {
+				sockoptErr = unix.SetsockoptInt(
+					int(fd), 
+					unix.SOL_SOCKET, 
+					unix.SO_REUSEPORT, 
+					1,
+				)
+			})
+
+			if err != nil {
+				return err
+			}
+			return sockoptErr
+		},
+	}
+
+	u.conn, err = lc.ListenPacket(context.Background(), "udp", ":8085")
 
 	return err
 }
 
-func (u UDP) Shutdown() {
+// Shutdown stops the server
+func (u *UDP) Shutdown() {
 	u.conn.Close()
 }
 
-func (u UDP) Start() {
+// ingress gets the data
+func (u *UDP) ingress(passphrase string) {
+	for {
+		b := u.bufPool.Get().([]byte)
+
+		n, _, err := u.conn.ReadFrom(b)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		u.TUNIf.Write(decrypt(b[:n], passphrase))
+		u.bufPool.Put(b)	
+	}
+}
+
+// egress sends out the data
+func (u *UDP) egress(passphrase string) {
+	// from tun interface to remote
+	rAddress, _ := net.ResolveUDPAddr("udp", u.RemoteHost)
+	for {
+		b := u.bufPool.Get().([]byte)
+
+		n, err := u.TUNIf.Read(b)
+		if err != nil {
+			continue
+		}
+
+		u.conn.WriteTo(encrypt(b[:n], passphrase), rAddress)
+		u.bufPool.Put(b)	
+	}
+}
+
+// Start runs the server
+func (u *UDP) Start() {
+	u.bufPool = sync.Pool{
+		New: func() interface{} {
+			return make([]byte, buffMaxSize)
+		},
+	}
+
+	for i := 0; i < u.MaxThreads; i++ {
+		go u.connection()
+	}
+
+	select {}
+}
+
+func (u UDP) connection() {
 	if err := u.connect(); err != nil {
 		log.Fatal(err)
 	}
 
 	passphrase := "6368616e676520746869732070617373776f726420746f206120736563726574"
 
-	// from remote to tun interface
-	go func() {
-		buff := make([]byte, buffMaxSize)	
-		for {
-			n, _, err := u.conn.ReadFrom(buff)	
-			if err != nil {
-				log.Println(err)
-				continue
-			}
+	go u.ingress(passphrase)
+	go u.egress(passphrase)
 
-			u.TUNIf.Write(decrypt(buff[:n], passphrase))
-		}
-	}()
-
-	// from tun interface to remote
-	go func() {
-		buff := make([]byte, buffMaxSize)
-		rAddress, _ := net.ResolveUDPAddr("udp", u.RemoteHost)
-		for {
-			n, err := u.TUNIf.Read(buff)
-			if err != nil {
-				continue
-			}
-
-			u.conn.WriteTo(encrypt(buff[:n], passphrase), rAddress)
-		}
-	}()
 }
 
 func encrypt(plainData []byte, passphrase string) []byte {
@@ -87,7 +141,7 @@ func encrypt(plainData []byte, passphrase string) []byte {
 	return gcm.Seal(nonce, nonce, plainData, nil)
 }
 
-func decrypt(cipherData []byte, passphrase string) []byte{
+func decrypt(cipherData []byte, passphrase string) []byte {
 	key, _ := hex.DecodeString(passphrase)
 	block, err := aes.NewCipher(key)
 	if err != nil {

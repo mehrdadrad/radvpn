@@ -18,9 +18,10 @@ func main() {
 	var srv server
 	flag.Parse()
 
-	srv = udp.UDP{
+	srv = &udp.UDP{
 		TUNIf:      netdev.New([]string{*localHost}, 1300),
 		RemoteHost: *remoteHost,
+		MaxThreads: 2,
 	}
 
 	srv.Start()
