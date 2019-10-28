@@ -21,7 +21,7 @@ const buffMaxSize = 1518
 // UDP represents the udp server
 type UDP struct {
 	conn       net.PacketConn
-	TUNIf      *water.Interface
+	TunIfce    *water.Interface
 	MaxThreads int
 	RemoteHost string
 	KeepAlive  time.Duration
@@ -74,7 +74,7 @@ func (u *UDP) ingress() {
 			continue
 		}
 
-		_, err = u.TUNIf.Write(u.Cipher.Decrypt(b[:n]))
+		_, err = u.TunIfce.Write(u.Cipher.Decrypt(b[:n]))
 		if err != nil {
 			log.Println(err)
 		}
@@ -89,7 +89,7 @@ func (u *UDP) egress() {
 	for {
 		b := u.bufPool.Get().([]byte)
 
-		n, err := u.TUNIf.Read(b)
+		n, err := u.TunIfce.Read(b)
 		if err != nil {
 			continue
 		}

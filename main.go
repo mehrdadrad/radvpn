@@ -4,9 +4,9 @@ import (
 	"flag"
 	"time"
 
-	"github.com/mehrdadrad/radvpn/udp"
-	"github.com/mehrdadrad/radvpn/netdev"
 	"github.com/mehrdadrad/radvpn/crypto"
+	"github.com/mehrdadrad/radvpn/netdev"
+	"github.com/mehrdadrad/radvpn/udp"
 )
 
 type server interface {
@@ -25,11 +25,11 @@ func main() {
 	}
 
 	srv = &udp.UDP{
-		TUNIf:      netdev.New([]string{*localHost}, 1300),
+		TunIfce:    netdev.New([]string{*localHost}, 1300),
 		RemoteHost: *remoteHost,
 		MaxThreads: 10,
-		KeepAlive: 10 * time.Second,
-		Cipher: crp,
+		KeepAlive:  10 * time.Second,
+		Cipher:     crp,
 	}
 
 	srv.Start()
