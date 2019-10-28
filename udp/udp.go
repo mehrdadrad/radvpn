@@ -31,7 +31,7 @@ func (u UDP) Shutdown() {
 	u.conn.Close()
 }
 
-func (u UDP) Run() {
+func (u UDP) Start() {
 	if err := u.connect(); err != nil {
 		log.Fatal(err)
 	}
