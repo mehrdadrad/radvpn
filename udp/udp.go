@@ -8,8 +8,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"errors"
 
 	"github.com/mehrdadrad/radvpn/crypto"
+	"github.com/mehrdadrad/radvpn/router"
 
 	"golang.org/x/sys/unix"
 
@@ -18,19 +20,24 @@ import (
 
 const buffMaxSize = 1518
 
-// UDP represents the udp server
-type UDP struct {
-	conn       net.PacketConn
-	TunIfce    *water.Interface
-	MaxThreads int
-	RemoteHost string
-	KeepAlive  time.Duration
-	Cipher     crypto.Cipher
-
-	bufPool sync.Pool
+// header represents ip v4/v6 header
+type header struct {
+	version int
+	src net.IP
+	dst net.IP
 }
 
-func (u *UDP) connect() error {
+// UDP represents the udp server
+type UDP struct {
+	conn        net.PacketConn
+	TunIfce     *water.Interface
+	MaxThreads  int
+	RemoteHosts []string
+	KeepAlive   time.Duration
+	Cipher      crypto.Cipher
+}
+
+func (u *UDP) connect(ctx context.Context) error {
 	var err error
 
 	lc := net.ListenConfig{
@@ -53,7 +60,7 @@ func (u *UDP) connect() error {
 		KeepAlive: u.KeepAlive,
 	}
 
-	u.conn, err = lc.ListenPacket(context.Background(), "udp", ":8085")
+	u.conn, err = lc.ListenPacket(ctx, "udp", ":8085")
 
 	return err
 }
@@ -64,9 +71,9 @@ func (u *UDP) Shutdown() {
 }
 
 // ingress gets the data
-func (u *UDP) ingress() {
+func (u *UDP) ingress(bufPool *sync.Pool) {
 	for {
-		b := u.bufPool.Get().([]byte)
+		b := bufPool.Get().([]byte)
 
 		n, _, err := u.conn.ReadFrom(b)
 		if err != nil {
@@ -78,50 +85,77 @@ func (u *UDP) ingress() {
 		if err != nil {
 			log.Println(err)
 		}
-		u.bufPool.Put(b)
+		bufPool.Put(b)
 	}
 }
 
 // egress sends out the data
-func (u *UDP) egress() {
-	// from tun interface to remote
-	rAddress, _ := net.ResolveUDPAddr("udp", u.RemoteHost)
+// from tun interface to remote
+func (u *UDP) egress(bufPool *sync.Pool) {
+	rAddress, _ := net.ResolveUDPAddr("udp", u.RemoteHosts[0])
 	for {
-		b := u.bufPool.Get().([]byte)
+		b := bufPool.Get().([]byte)
 
 		n, err := u.TunIfce.Read(b)
 		if err != nil {
 			continue
 		}
 
+		h, _ := parseHeader(b)
+		log.Printf("%v\n", h.dst)
+
 		_, err = u.conn.WriteTo(u.Cipher.Encrypt(b[:n]), rAddress)
 		if err != nil {
 			log.Println(err)
 		}
-		u.bufPool.Put(b)
+		bufPool.Put(b)
 	}
 }
 
 // Start runs the server
-func (u *UDP) Start() {
-	u.bufPool = sync.Pool{
+func (u *UDP) Start(ctx context.Context) {
+	bufPool := &sync.Pool{
 		New: func() interface{} {
 			return make([]byte, buffMaxSize)
 		},
 	}
 
 	for i := 0; i < u.MaxThreads; i++ {
-		go u.run()
+		go u.thread(ctx, bufPool)
 	}
-
-	select {}
 }
 
-func (u UDP) run() {
-	if err := u.connect(); err != nil {
+func (u UDP) thread(ctx context.Context, bufPool *sync.Pool) {
+	if err := u.connect(ctx); err != nil {
 		log.Fatal(err)
 	}
 
-	go u.ingress()
-	go u.egress()
+	go u.ingress(bufPool)
+	go u.egress(bufPool)
+}
+
+func parseHeader(b []byte) (*header, error) {
+	if len(b) < net.IPv4len {
+		return nil, errors.New("small packet")	
+	}
+
+	h := new(header)
+
+	h.version = int(b[0] >> 4)
+
+	if h.version == 4 {
+		h.src = make(net.IP, net.IPv4len)
+		copy(h.src, b[12:16])
+		h.dst = make(net.IP, net.IPv4len)
+		copy(h.dst, b[16:20])
+
+		return h, nil
+	}
+
+	h.src = make(net.IP, net.IPv6len)
+	copy(h.src, b[8:24])
+	h.dst = make(net.IP, net.IPv6len)
+	copy(h.dst, b[24:40])
+
+	return h, nil
 }
