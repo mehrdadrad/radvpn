@@ -16,7 +16,7 @@ type server interface {
 	Start(context.Context)
 }
 
-var localHost = flag.String("local", "10.0.1.1/24", "IP/Mask")
+var localHost = flag.String("local", "10.0.2.1/24", "IP/Mask")
 var remoteHost = flag.String("remote", "192.168.55.10:8085", "IP:Port")
 
 func main() {
@@ -31,15 +31,14 @@ func main() {
 	}
 
 	r := router.New()
-	table := r.Table()
 
 	_, dst, _ := net.ParseCIDR("10.0.1.0/24")
-	nh := net.ParseIP("192.168.55.10")
-	table.Add(dst, nh)
+	nexthop := net.ParseIP("192.168.55.10")
+	r.Table().Add(dst, nexthop)
 
 	_, dst, _ = net.ParseCIDR("10.0.2.0/24")
-	nh = net.ParseIP("192.168.55.20")
-	table.Add(dst, nh)
+	nexthop = net.ParseIP("192.168.55.20")
+	r.Table().Add(dst, nexthop)
 
 
 	srv = &udp.UDP{
@@ -52,6 +51,7 @@ func main() {
 	}
 
 	srv.Start(ctx)
+	r.Table().Dump()
 
 	select {}
 }

@@ -2,7 +2,12 @@ package router
 
 import (
 	"net"
+	"fmt"
 )
+
+type Gateway interface {
+	Table() *routes
+}
 
 type NextHop struct {
 	IP net.IP
@@ -41,6 +46,12 @@ func (r routes) Get(dst net.IP) net.IP {
 	}
 
 	return nil
+}
+
+func (r routes) Dump() {
+	for _, route := range r.table {
+		fmt.Println(route.Dst, route.NextHop.IP)
+	}	
 }
 
 func New() *Router {
