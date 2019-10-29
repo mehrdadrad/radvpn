@@ -35,6 +35,7 @@ type UDP struct {
 	RemoteHosts []string
 	KeepAlive   time.Duration
 	Cipher      crypto.Cipher
+	Router      *router.Router
 }
 
 func (u *UDP) connect(ctx context.Context) error {
@@ -92,7 +93,6 @@ func (u *UDP) ingress(bufPool *sync.Pool) {
 // egress sends out the data
 // from tun interface to remote
 func (u *UDP) egress(bufPool *sync.Pool) {
-	rAddress, _ := net.ResolveUDPAddr("udp", u.RemoteHosts[0])
 	for {
 		b := bufPool.Get().([]byte)
 
@@ -102,9 +102,11 @@ func (u *UDP) egress(bufPool *sync.Pool) {
 		}
 
 		h, _ := parseHeader(b)
-		log.Printf("%v\n", h.dst)
+		table := u.Router.Table()
+		nexthop := table.Get(h.dst)
+		rAddr, _ := net.ResolveUDPAddr("udp", nexthop.String() + ":8085")
 
-		_, err = u.conn.WriteTo(u.Cipher.Encrypt(b[:n]), rAddress)
+		_, err = u.conn.WriteTo(u.Cipher.Encrypt(b[:n]), rAddr)
 		if err != nil {
 			log.Println(err)
 		}
