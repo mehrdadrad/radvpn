@@ -53,7 +53,7 @@ func main() {
 	srv = &udp.UDP{
 		TunIfce:     ifce,
 		RemoteHosts: []string{*remoteHost},
-		MaxThreads:  10,
+		MaxThreads:  100,
 		KeepAlive:   10 * time.Second,
 		Cipher:      crp,
 		Router:      r,

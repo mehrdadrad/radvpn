@@ -9,7 +9,7 @@ import (
 
 // Gateway interfaces to router
 type Gateway interface {
-	Table() *routes
+	Table() *Routes
 }
 
 // NextHop represents nexthop / gateway
@@ -19,11 +19,11 @@ type NextHop struct {
 
 // Router represents router
 type Router struct {
-	routes *routes
+	routes *Routes
 }
 
 // Table returns touting table
-func (r *Router) Table() *routes {
+func (r *Router) Table() *Routes {
 	return r.routes
 }
 
@@ -33,13 +33,13 @@ type Route struct {
 	Dst     *net.IPNet
 }
 
-// routes represents array of routes
-type routes struct {
+// Routes represents array of routes
+type Routes struct {
 	table []Route
 }
 
 // Add appends a new route to table and operating system
-func (r *routes) Add(dst *net.IPNet, nexthop net.IP) error {
+func (r *Routes) Add(dst *net.IPNet, nexthop net.IP) error {
 	// check if route exist
 	for _, route := range r.table {
 		if route.Dst == dst {
@@ -71,7 +71,7 @@ func (r *routes) Add(dst *net.IPNet, nexthop net.IP) error {
 }
 
 // Get returns nexthop for a specific dest.
-func (r routes) Get(dst net.IP) net.IP {
+func (r Routes) Get(dst net.IP) net.IP {
 	for _, route := range r.table {
 		if route.Dst.Contains(dst) {
 			return route.NextHop.IP
@@ -82,7 +82,7 @@ func (r routes) Get(dst net.IP) net.IP {
 }
 
 // Dump prints out all routing table
-func (r routes) Dump() {
+func (r Routes) Dump() {
 	fmt.Println("destination\tnexthop")
 	for _, route := range r.table {
 		fmt.Println(route.Dst, route.NextHop.IP)
@@ -91,5 +91,5 @@ func (r routes) Dump() {
 
 // New constructs a new router
 func New() *Router {
-	return &Router{new(routes)}
+	return &Router{new(Routes)}
 }

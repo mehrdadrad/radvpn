@@ -5,7 +5,6 @@ import (
 
 	"log"
 	"net"
-	"sync"
 	"syscall"
 	"time"
 	"errors"
@@ -27,6 +26,12 @@ type header struct {
 	dst net.IP
 }
 
+// MGT represents in-bound management data
+type MGT struct {
+	code int
+	data []byte
+}
+
 // UDP represents the udp server
 type UDP struct {
 	conn        net.PacketConn
@@ -36,11 +41,11 @@ type UDP struct {
 	KeepAlive   time.Duration
 	Cipher      crypto.Cipher
 	Router      router.Gateway
+
+	Local		chan *MGT
 }
 
-func (u *UDP) connect(ctx context.Context) error {
-	var err error
-
+func (u *UDP) connect(ctx context.Context) (net.PacketConn ,error) {
 	lc := net.ListenConfig{
 		Control: func(network, address string, c syscall.RawConn) error {
 			var sockoptErr error
@@ -61,9 +66,7 @@ func (u *UDP) connect(ctx context.Context) error {
 		KeepAlive: u.KeepAlive,
 	}
 
-	u.conn, err = lc.ListenPacket(ctx, "udp", ":8085")
-
-	return err
+	return lc.ListenPacket(ctx, "udp", ":8085")
 }
 
 // Shutdown stops the server
@@ -72,67 +75,80 @@ func (u *UDP) Shutdown() {
 }
 
 // ingress gets the data
-func (u *UDP) ingress(bufPool *sync.Pool) {
+func (u *UDP) ingress(conn net.PacketConn) {
+	var (
+		dec []byte
+		buf = make([]byte, buffMaxSize)
+	)
 	for {
-		b := bufPool.Get().([]byte)
-
-		n, _, err := u.conn.ReadFrom(b)
+		n, _, err := conn.ReadFrom(buf)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		_, err = u.TunIfce.Write(u.Cipher.Decrypt(b[:n]))
+		dec = u.Cipher.Decrypt(buf[:n])
+		//h, _ := parseHeader(dec)
+		//log.Println(h.dst)
+
+		_, err = u.TunIfce.Write(dec)
 		if err != nil {
 			log.Println(err)
 		}
-		bufPool.Put(b)
 	}
 }
 
 // egress sends out the data
 // from tun interface to remote
-func (u *UDP) egress(bufPool *sync.Pool) {
-	for {
-		b := bufPool.Get().([]byte)
+func (u *UDP) egress(conn net.PacketConn) {
+	var (
+		buf = make([]byte, buffMaxSize)
+		nexthop net.IP
+		rAddr *net.UDPAddr
+		err error
+		h *header
+		n int
+	)
 
-		n, err := u.TunIfce.Read(b)
+	for {
+		n, err = u.TunIfce.Read(buf)
 		if err != nil {
 			continue
 		}
 
-		h, _ := parseHeader(b)
-		nexthop := u.Router.Table().Get(h.dst)
-		rAddr, _ := net.ResolveUDPAddr("udp", nexthop.String() + ":8085")
+		h, err = parseHeader(buf)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
 
-		_, err = u.conn.WriteTo(u.Cipher.Encrypt(b[:n]), rAddr)
+		nexthop = u.Router.Table().Get(h.dst)
+		rAddr, _ = net.ResolveUDPAddr("udp", nexthop.String() + ":8085")
+
+		_, err = conn.WriteTo(u.Cipher.Encrypt(buf[:n]), rAddr)
 		if err != nil {
 			log.Println(err)
 		}
-		bufPool.Put(b)
 	}
 }
 
 // Start runs the server
 func (u *UDP) Start(ctx context.Context) {
-	bufPool := &sync.Pool{
-		New: func() interface{} {
-			return make([]byte, buffMaxSize)
-		},
-	}
-
 	for i := 0; i < u.MaxThreads; i++ {
-		go u.thread(ctx, bufPool)
+		go u.thread(ctx)
 	}
 }
 
-func (u UDP) thread(ctx context.Context, bufPool *sync.Pool) {
-	if err := u.connect(ctx); err != nil {
+func (u UDP) thread(ctx context.Context) {
+	conn, err := u.connect(ctx)
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	go u.ingress(bufPool)
-	go u.egress(bufPool)
+	go u.ingress(conn)
+	go u.egress(conn)
+
+	select{}
 }
 
 func parseHeader(b []byte) (*header, error) {
