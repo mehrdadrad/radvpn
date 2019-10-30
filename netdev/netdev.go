@@ -18,9 +18,11 @@ func (n *netdev) create() error {
 
 	config := water.Config{
 		DeviceType: water.TUN,
+		PlatformSpecificParams: water.PlatformSpecificParams{
+			Name: "radvpn",
+			MultiQueue: true,
+		},
 	}
-
-	config.Name = "radvpn"
 
 	n.ifce, err = water.New(config)
 	if err != nil {
