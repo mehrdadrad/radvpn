@@ -18,7 +18,10 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-const maxBufsize = 1518
+const (
+	maxBufSize  = 1518
+	maxChanSize = 1000
+)
 
 // Server represents vpn server
 type Server struct {
@@ -36,8 +39,9 @@ type Server struct {
 }
 
 type tun struct {
+	logger *log.Logger
+
 	maxWorkers int
-	logger     *log.Logger
 
 	read  chan []byte
 	write chan []byte
@@ -53,7 +57,7 @@ type header struct {
 func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 	bp := &sync.Pool{
 		New: func() interface{} {
-			return make([]byte, maxBufsize)
+			return make([]byte, maxBufSize)
 		},
 	}
 
@@ -61,16 +65,16 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 
 	s.maxWorkers = maxNetWorkers
 
-	s.read = make(chan []byte, 1000)
-	s.write = make(chan []byte, 1000)
+	s.read = make(chan []byte, maxChanSize)
+	s.write = make(chan []byte, maxChanSize)
 
 	t := &tun{
 		maxWorkers: maxTunWorkers,
 		logger:     s.Logger,
 	}
 
-	t.read = make(chan []byte, 1000)
-	t.write = make(chan []byte, 1000)
+	t.read = make(chan []byte, maxChanSize)
+	t.write = make(chan []byte, maxChanSize)
 
 	go t.run(ctx, bp)
 	go s.run(ctx, bp)
@@ -101,11 +105,11 @@ func (s *Server) cross(ctx context.Context, t *tun) {
 				b = s.Cipher.Decrypt(b)
 			}
 
-			select{
+			select {
 			case t.write <- b:
-			case <- ctx.Done():
+			case <-ctx.Done():
 				return
-			}	
+			}
 		}
 	}()
 
@@ -116,11 +120,11 @@ func (s *Server) cross(ctx context.Context, t *tun) {
 				b = s.Cipher.Encrypt(b)
 			}
 
-			select{
+			select {
 			case s.write <- b:
-			case <- ctx.Done():
+			case <-ctx.Done():
 				return
-			}	
+			}
 		}
 	}()
 }
@@ -160,8 +164,8 @@ func (s *Server) reader(ctx context.Context, conn net.PacketConn, bp *sync.Pool)
 
 		select {
 		case s.read <- b[:n]:
-		case <- ctx.Done():
-			return	
+		case <-ctx.Done():
+			return
 		default:
 		}
 	}
@@ -178,18 +182,21 @@ func (s *Server) writer(ctx context.Context, conn net.PacketConn, bp *sync.Pool)
 			}
 
 			nexthop := s.Router.Table().Get(h.dst)
-			rAddr, _ := net.ResolveUDPAddr("udp", nexthop.String()+":8085")
+			if nexthop != nil {
+				rAddr, _ := net.ResolveUDPAddr("udp",
+					net.JoinHostPort(nexthop.String(), "8085"))
 
-			_, err = conn.WriteTo(b, rAddr)
-			if err != nil {
-				log.Println(err)
+				_, err = conn.WriteTo(b, rAddr)
+				if err != nil {
+					log.Println(err)
+				}
 			}
 
-			b = b[:maxBufsize]
+			b = b[:maxBufSize]
 			bp.Put(b)
 
-		case <- ctx.Done():
-			return	
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -242,7 +249,7 @@ func (t *tun) writer(ctx context.Context, ifce *water.Interface, bp *sync.Pool) 
 				t.logger.Println(err)
 			}
 
-			b = b[:maxBufsize]
+			b = b[:maxBufSize]
 			bp.Put(b)
 
 		case <-ctx.Done():
