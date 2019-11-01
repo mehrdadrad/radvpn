@@ -11,6 +11,7 @@ import (
 
 	"github.com/mehrdadrad/radvpn/crypto"
 	"github.com/mehrdadrad/radvpn/router"
+	"github.com/mehrdadrad/radvpn/netdev"
 
 	"golang.org/x/sys/unix"
 
@@ -75,7 +76,7 @@ func (u *UDP) Shutdown() {
 }
 
 // ingress gets the data
-func (u *UDP) ingress(conn net.PacketConn) {
+func (u *UDP) ingress(conn net.PacketConn, ifce *water.Interface) {
 	var (
 		dec []byte
 		buf = make([]byte, buffMaxSize)
@@ -91,7 +92,7 @@ func (u *UDP) ingress(conn net.PacketConn) {
 		//h, _ := parseHeader(dec)
 		//log.Println(h.dst)
 
-		_, err = u.TunIfce.Write(dec)
+		_, err = ifce.Write(dec)
 		if err != nil {
 			log.Println(err)
 		}
@@ -100,7 +101,7 @@ func (u *UDP) ingress(conn net.PacketConn) {
 
 // egress sends out the data
 // from tun interface to remote
-func (u *UDP) egress(conn net.PacketConn) {
+func (u *UDP) egress(conn net.PacketConn, ifce *water.Interface) {
 	var (
 		buf = make([]byte, buffMaxSize)
 		nexthop net.IP
@@ -111,7 +112,7 @@ func (u *UDP) egress(conn net.PacketConn) {
 	)
 
 	for {
-		n, err = u.TunIfce.Read(buf)
+		n, err = ifce.Read(buf)
 		if err != nil {
 			continue
 		}
@@ -145,8 +146,13 @@ func (u UDP) thread(ctx context.Context) {
 		log.Fatal(err)
 	}
 
-	go u.ingress(conn)
-	go u.egress(conn)
+	ifce, err := netdev.GetTunIfceHandler()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go u.ingress(conn, ifce)
+	go u.egress(conn, ifce)
 
 	select{}
 }

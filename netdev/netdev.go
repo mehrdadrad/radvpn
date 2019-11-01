@@ -88,3 +88,15 @@ func New(ipaddrs []string, mtu int) *water.Interface {
 
 	return nd.ifce
 }
+
+func GetTunIfceHandler() (*water.Interface, error) {
+	config := water.Config{
+		DeviceType: water.TUN,
+		PlatformSpecificParams: water.PlatformSpecificParams{
+			Name: "radvpn",
+			MultiQueue: true,
+		},
+	}
+
+	return water.New(config)
+}
