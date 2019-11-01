@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mehrdadrad/radvpn/crypto"
 	"github.com/mehrdadrad/radvpn/router"
 
 	"golang.org/x/sys/unix"
@@ -21,8 +22,11 @@ const maxBufsize = 1518
 
 // Server represents vpn server
 type Server struct {
-	KeepAlive     time.Duration
-	Router        router.Gateway
+	Cipher      crypto.Cipher
+	KeepAlive   time.Duration
+	Router      router.Gateway
+	Compression bool
+	Insecure    bool
 
 	maxWorkers int
 
@@ -32,8 +36,6 @@ type Server struct {
 
 type tun struct {
 	maxWorkers int
-	ifces chan *water.Interface
-	ii *water.Interface
 
 	read  chan []byte
 	write chan []byte
@@ -91,6 +93,9 @@ func (s *Server) cross(t *tun) {
 	go func() {
 		for {
 			b := <-s.read
+			if !s.Insecure {
+				b = s.Cipher.Decrypt(b)
+			}
 			t.write <- b
 		}
 	}()
@@ -98,6 +103,9 @@ func (s *Server) cross(t *tun) {
 	go func() {
 		for {
 			b := <-t.read
+			if !s.Insecure {
+				b = s.Cipher.Encrypt(b)
+			}
 			s.write <- b
 		}
 	}()
@@ -128,7 +136,6 @@ func (s Server) listenPacket(ctx context.Context) (net.PacketConn, error) {
 }
 
 func (s *Server) reader(ctx context.Context, conn net.PacketConn, bp *sync.Pool) {
-
 	for {
 		b := bp.Get().([]byte)
 		n, _, err := conn.ReadFrom(b)
@@ -174,19 +181,16 @@ func (t tun) run(ctx context.Context, bp *sync.Pool) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		go t.reader(ctx, ifce, bp, i)
-		go t.writer(ctx, ifce, bp, i)
+		go t.reader(ctx, ifce, bp)
+		go t.writer(ctx, ifce, bp)
 	}
 
 	<-ctx.Done()
 }
 
 // reader reads from tun interface
-func (t *tun) reader(ctx context.Context, ifce *water.Interface, bp *sync.Pool, i int) {
-	//ifce := <- t.ifces
-
+func (t *tun) reader(ctx context.Context, ifce *water.Interface, bp *sync.Pool) {
 	for {
-		log.Println("threaad read #", i)
 		b := bp.Get().([]byte)
 		n, err := ifce.Read(b)
 		if err != nil {
@@ -201,11 +205,10 @@ func (t *tun) reader(ctx context.Context, ifce *water.Interface, bp *sync.Pool, 
 }
 
 // writer writes to tun interface
-func (t *tun) writer(ctx context.Context, ifce *water.Interface, bp *sync.Pool, i int) {
+func (t *tun) writer(ctx context.Context, ifce *water.Interface, bp *sync.Pool) {
 	//ifce := <- t.ifces
 
 	for {
-		log.Println("threaad write #", i)
 		b := <-t.write
 		_, err := ifce.Write(b)
 		if err != nil {
@@ -233,6 +236,7 @@ func SetupTunInterface(ipaddrs []string, mtu int) error {
 
 	ifce, _ := netlink.LinkByName(ifname)
 	netlink.LinkSetMTU(ifce, mtu)
+	netlink.LinkSetTxQLen(ifce, 1000)
 	netlink.LinkSetUp(ifce)
 
 	for _, ipnet := range ipaddrs {

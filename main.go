@@ -1,16 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"log"
 	"net"
 	"time"
-	"log"
-	"context"
 
-	// "github.com/mehrdadrad/radvpn/crypto"
-	"github.com/mehrdadrad/radvpn/server"
+	"github.com/mehrdadrad/radvpn/crypto"
 	"github.com/mehrdadrad/radvpn/router"
-	// "github.com/mehrdadrad/radvpn/udp"
+	"github.com/mehrdadrad/radvpn/server"
 )
 
 var localHost = flag.String("local", "10.0.2.1/24", "IP/Mask")
@@ -20,8 +19,12 @@ func main() {
 	flag.Parse()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	server.SetupTunInterface([]string{*localHost}, 1300)
 
+	crp := crypto.GCM{
+		Passphrase: "6368616e676520746869732070617373776f726420746f206120736563726574",
+	}
 
 	r := router.New()
 
@@ -41,12 +44,13 @@ func main() {
 
 	s := server.Server{
 		KeepAlive: 10 * time.Second,
-		Router: r,
+		Insecure:  true,
+		Cipher:    crp,
+		Router:    r,
 	}
 
 	s.Run(ctx, 10, 10)
 }
-
 
 /*
 func main() {
