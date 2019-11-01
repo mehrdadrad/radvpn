@@ -25,6 +25,7 @@ type Server struct {
 	Cipher      crypto.Cipher
 	KeepAlive   time.Duration
 	Router      router.Gateway
+	Logger      *log.Logger
 	Compression bool
 	Insecure    bool
 
@@ -36,6 +37,7 @@ type Server struct {
 
 type tun struct {
 	maxWorkers int
+	logger     *log.Logger
 
 	read  chan []byte
 	write chan []byte
@@ -62,8 +64,10 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 	s.read = make(chan []byte, 1000)
 	s.write = make(chan []byte, 1000)
 
-	t := new(tun)
-	t.maxWorkers = maxTunWorkers
+	t := &tun{
+		maxWorkers: maxTunWorkers,
+		logger:     s.Logger,
+	}
 
 	t.read = make(chan []byte, 1000)
 	t.write = make(chan []byte, 1000)
@@ -71,7 +75,7 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 	go t.run(ctx, bp)
 	go s.run(ctx, bp)
 
-	s.cross(t)
+	s.cross(ctx, t)
 
 	<-ctx.Done()
 }
@@ -80,7 +84,7 @@ func (s Server) run(ctx context.Context, bp *sync.Pool) {
 	for i := 0; i < s.maxWorkers; i++ {
 		conn, err := s.listenPacket(ctx)
 		if err != nil {
-			log.Fatal(err)
+			s.Logger.Fatal(err)
 
 		}
 
@@ -89,14 +93,19 @@ func (s Server) run(ctx context.Context, bp *sync.Pool) {
 	}
 }
 
-func (s *Server) cross(t *tun) {
+func (s *Server) cross(ctx context.Context, t *tun) {
 	go func() {
 		for {
 			b := <-s.read
 			if !s.Insecure {
 				b = s.Cipher.Decrypt(b)
 			}
-			t.write <- b
+
+			select{
+			case t.write <- b:
+			case <- ctx.Done():
+				return
+			}	
 		}
 	}()
 
@@ -106,7 +115,12 @@ func (s *Server) cross(t *tun) {
 			if !s.Insecure {
 				b = s.Cipher.Encrypt(b)
 			}
-			s.write <- b
+
+			select{
+			case s.write <- b:
+			case <- ctx.Done():
+				return
+			}	
 		}
 	}()
 }
@@ -140,12 +154,14 @@ func (s *Server) reader(ctx context.Context, conn net.PacketConn, bp *sync.Pool)
 		b := bp.Get().([]byte)
 		n, _, err := conn.ReadFrom(b)
 		if err != nil {
-			log.Println(err)
+			s.Logger.Println(err)
 			continue
 		}
 
 		select {
 		case s.read <- b[:n]:
+		case <- ctx.Done():
+			return	
 		default:
 		}
 	}
@@ -153,20 +169,27 @@ func (s *Server) reader(ctx context.Context, conn net.PacketConn, bp *sync.Pool)
 
 func (s *Server) writer(ctx context.Context, conn net.PacketConn, bp *sync.Pool) {
 	for {
-		b := <-s.write
+		select {
+		case b := <-s.write:
+			h, err := parseHeader(b)
+			if err != nil {
+				s.Logger.Println(err)
+				continue
+			}
 
-		h, err := parseHeader(b)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
+			nexthop := s.Router.Table().Get(h.dst)
+			rAddr, _ := net.ResolveUDPAddr("udp", nexthop.String()+":8085")
 
-		nexthop := s.Router.Table().Get(h.dst)
-		rAddr, _ := net.ResolveUDPAddr("udp", nexthop.String()+":8085")
+			_, err = conn.WriteTo(b, rAddr)
+			if err != nil {
+				log.Println(err)
+			}
 
-		_, err = conn.WriteTo(b, rAddr)
-		if err != nil {
-			log.Println(err)
+			b = b[:maxBufsize]
+			bp.Put(b)
+
+		case <- ctx.Done():
+			return	
 		}
 	}
 }
@@ -179,7 +202,7 @@ func (t tun) run(ctx context.Context, bp *sync.Pool) {
 	for i := 0; i < t.maxWorkers; i++ {
 		ifce, err := createTunInterface()
 		if err != nil {
-			log.Fatal(err)
+			t.logger.Fatal(err)
 		}
 		go t.reader(ctx, ifce, bp)
 		go t.writer(ctx, ifce, bp)
@@ -194,11 +217,14 @@ func (t *tun) reader(ctx context.Context, ifce *water.Interface, bp *sync.Pool) 
 		b := bp.Get().([]byte)
 		n, err := ifce.Read(b)
 		if err != nil {
-			log.Println(err)
+			t.logger.Println(err)
 		}
 
 		select {
 		case t.read <- b[:n]:
+		case <-ctx.Done():
+			return
+
 		default:
 		}
 	}
@@ -206,13 +232,21 @@ func (t *tun) reader(ctx context.Context, ifce *water.Interface, bp *sync.Pool) 
 
 // writer writes to tun interface
 func (t *tun) writer(ctx context.Context, ifce *water.Interface, bp *sync.Pool) {
-	//ifce := <- t.ifces
+	var b []byte
 
 	for {
-		b := <-t.write
-		_, err := ifce.Write(b)
-		if err != nil {
-			log.Println(err)
+		select {
+		case b = <-t.write:
+			_, err := ifce.Write(b)
+			if err != nil {
+				t.logger.Println(err)
+			}
+
+			b = b[:maxBufsize]
+			bp.Put(b)
+
+		case <-ctx.Done():
+			return
 		}
 	}
 }
