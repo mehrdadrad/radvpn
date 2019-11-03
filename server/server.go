@@ -8,7 +8,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"os"
 
+	"github.com/mehrdadrad/radvpn/config"
 	"github.com/mehrdadrad/radvpn/crypto"
 	"github.com/mehrdadrad/radvpn/router"
 
@@ -28,6 +30,7 @@ type Server struct {
 	Cipher      crypto.Cipher
 	KeepAlive   time.Duration
 	Router      router.Gateway
+	Config      *config.Config
 	Logger      *log.Logger
 	Compression bool
 	Insecure    bool
@@ -61,6 +64,15 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 		},
 	}
 
+	node, err := s.Config.Whoami()
+	if err != nil {
+		//TODO
+	}
+
+	s.Logger.Println(node.Name, node.PrivateAddresses)
+	SetupTunInterface(node.PrivateAddresses, s.Config.Server.Mtu)
+
+	s.UpdateRoutes()
 	s.Router.Table().Dump()
 
 	s.maxWorkers = maxNetWorkers
@@ -192,11 +204,25 @@ func (s *Server) writer(ctx context.Context, conn net.PacketConn, bp *sync.Pool)
 				}
 			}
 
-			b = b[:maxBufSize]
-			bp.Put(b)
+			//b = b[:maxBufSize]
+			//bp.Put(b)
 
 		case <-ctx.Done():
 			return
+		}
+	}
+}
+
+func (s *Server) UpdateRoutes() {
+	irb := s.Config.GetIRB()
+	for nexthop, subnets := range irb {
+		for _, subnet := range subnets {
+			_, dst, _ := net.ParseCIDR(subnet)
+			nexthop := net.ParseIP(nexthop)
+			err := s.Router.Table().Add(dst, nexthop)
+			if err != nil && !errors.Is(err, os.ErrExist) {
+				log.Println(err)
+			}
 		}
 	}
 }
@@ -249,8 +275,8 @@ func (t *tun) writer(ctx context.Context, ifce *water.Interface, bp *sync.Pool) 
 				t.logger.Println(err)
 			}
 
-			b = b[:maxBufSize]
-			bp.Put(b)
+			//b = b[:maxBufSize]
+			//bp.Put(b)
 
 		case <-ctx.Done():
 			return

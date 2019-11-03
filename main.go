@@ -2,53 +2,42 @@ package main
 
 import (
 	"context"
-	"flag"
 	"log"
-	"net"
-	"time"
 	"os"
+	"time"
 
+	"github.com/mehrdadrad/radvpn/config"
 	"github.com/mehrdadrad/radvpn/crypto"
 	"github.com/mehrdadrad/radvpn/router"
 	"github.com/mehrdadrad/radvpn/server"
 )
 
-var localHost = flag.String("local", "10.0.2.1/24", "IP/Mask")
-var remoteHost = flag.String("remote", "192.168.55.10:8085", "IP:Port")
-
 func main() {
-	flag.Parse()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	server.SetupTunInterface([]string{*localHost}, 1300)
+	cfg := config.New().File()
+	err := cfg.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	crp := crypto.GCM{
-		Passphrase: "6368616e676520746869732070617373776f726420746f206120736563726574",
+		Passphrase: cfg.Crypto.Key,
 	}
+
+	log.Println(cfg.Crypto.Key)
+	log.Println("keylen", len(cfg.Crypto.Key))
 
 	r := router.New()
 
-	_, dst, _ := net.ParseCIDR("10.0.1.0/24")
-	nexthop := net.ParseIP("192.168.55.10")
-	err := r.Table().Add(dst, nexthop)
-	if err != nil {
-		log.Println(err)
-	}
-
-	_, dst, _ = net.ParseCIDR("10.0.2.0/24")
-	nexthop = net.ParseIP("192.168.55.20")
-	err = r.Table().Add(dst, nexthop)
-	if err != nil {
-		log.Println(err)
-	}
-
 	s := server.Server{
 		KeepAlive: 10 * time.Second,
-		Insecure:  true,
+		Insecure:  cfg.Server.Insecure,
 		Cipher:    crp,
+		Config:    cfg,
 		Router:    r,
-		Logger:	   log.New(os.Stdout, "", log.Lshortfile),
+		Logger:    log.New(os.Stdout, "", log.Lshortfile),
 	}
 
 	s.Run(ctx, 10, 10)

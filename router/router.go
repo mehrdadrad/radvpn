@@ -1,8 +1,9 @@
 package router
 
 import (
-	"net"
 	"fmt"
+	"sync"
+	"net"
 
 	"github.com/vishvananda/netlink"
 )
@@ -29,40 +30,46 @@ func (r *Router) Table() *Routes {
 
 // Route represents a route
 type Route struct {
-	NextHop NextHop
-	Dst     *net.IPNet
+	NextHop   NextHop
+	NetworkID *net.IPNet
 }
 
 // Routes represents array of routes
 type Routes struct {
+	sync.Mutex
+
 	table []Route
 }
 
 // Add appends a new route to table and operating system
-func (r *Routes) Add(dst *net.IPNet, nexthop net.IP) error {
+func (r *Routes) Add(networkid *net.IPNet, nexthop net.IP) error {
 	// check if route exist
 	for _, route := range r.table {
-		if route.Dst == dst {
-			return fmt.Errorf("route exist %s %s", dst, nexthop)
+		if nexthop.Equal(route.NextHop.IP) && networkid.String() == route.NetworkID.String() {
+			return fmt.Errorf("route exist %s %s", networkid, nexthop)
 		}
 	}
 
-	r.table = append(r.table, Route{
-		NextHop: NextHop{IP:nexthop},
-		Dst: dst,
-	})	
+	r.Lock()
 
-	// add route to operating system 
+	r.table = append(r.table, Route{
+		NextHop:   NextHop{IP: nexthop},
+		NetworkID: networkid,
+	})
+
+	r.Unlock()
+
+	// add route to operating system
 	ifce, err := netlink.LinkByName("radvpn")
 	if err != nil {
 		return err
 	}
 
-	rr := &netlink.Route{
-		Dst: dst,
+	route := &netlink.Route{
+		Dst:       networkid,
 		LinkIndex: ifce.Attrs().Index,
 	}
-	err = netlink.RouteAdd(rr)	
+	err = netlink.RouteAdd(route)
 	if err != nil {
 		return err
 	}
@@ -71,9 +78,9 @@ func (r *Routes) Add(dst *net.IPNet, nexthop net.IP) error {
 }
 
 // Get returns nexthop for a specific dest.
-func (r Routes) Get(dst net.IP) net.IP {
+func (r *Routes) Get(dst net.IP) net.IP {
 	for _, route := range r.table {
-		if route.Dst.Contains(dst) {
+		if route.NetworkID.Contains(dst) {
 			return route.NextHop.IP
 		}
 	}
@@ -82,11 +89,11 @@ func (r Routes) Get(dst net.IP) net.IP {
 }
 
 // Dump prints out all routing table
-func (r Routes) Dump() {
-	fmt.Println("destination\tnexthop")
+func (r *Routes) Dump() {
+	fmt.Println("networkid\tnexthop")
 	for _, route := range r.table {
-		fmt.Println(route.Dst, route.NextHop.IP)
-	}	
+		fmt.Println(route.NetworkID, route.NextHop.IP)
+	}
 }
 
 // New constructs a new router
