@@ -1,6 +1,6 @@
 package config
 
-import(
+import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 )
@@ -9,7 +9,7 @@ type file struct {
 	paths []string
 }
 
-func(f file) load() (*Config, error) {
+func (f file) load() (*Config, error) {
 	content, err := ioutil.ReadFile("./config.yaml")
 	if err != nil {
 		return nil, err
@@ -25,6 +25,6 @@ func(f file) load() (*Config, error) {
 	return c, nil
 }
 
-func(f file) watch() {
+func (f file) watch() {
 
 }

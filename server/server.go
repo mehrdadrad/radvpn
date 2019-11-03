@@ -26,10 +26,10 @@ const (
 
 // Server represents vpn server
 type Server struct {
-	Cipher      crypto.Cipher
-	Router      router.Gateway
-	Config      *config.Config
-	Logger      *log.Logger
+	Cipher crypto.Cipher
+	Router router.Gateway
+	Config *config.Config
+	Logger *log.Logger
 
 	maxWorkers int
 
@@ -56,7 +56,7 @@ type header struct {
 func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 	node, err := s.Config.Whoami()
 	if err != nil {
-		log.Fatal(err)	
+		log.Fatal(err)
 	}
 
 	if !s.Config.Server.Insecure {
@@ -95,7 +95,7 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 func (s *Server) initCrypto() error {
 	switch s.Config.Crypto.Type {
 	case "gcm":
-		 s.Cipher = crypto.GCM{
+		s.Cipher = crypto.GCM{
 			Passphrase: s.Config.Crypto.Key,
 		}
 	default:
@@ -121,7 +121,7 @@ func (s *Server) cross(ctx context.Context, t *tun) {
 	go func() {
 		for {
 			b := <-s.read
-			
+
 			select {
 			case t.write <- b:
 			case <-ctx.Done():

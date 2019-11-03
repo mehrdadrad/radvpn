@@ -1,6 +1,6 @@
 package crypto
 
-import(
+import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -9,7 +9,7 @@ import(
 	"log"
 )
 
-// GCM represents Galois/Counter Mode 
+// GCM represents Galois/Counter Mode
 type GCM struct {
 	Passphrase string
 }

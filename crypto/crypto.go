@@ -1,11 +1,11 @@
 package crypto
 
-import(
+import (
 	"crypto/sha1"
 	"errors"
-)	
+)
 
-// Cipher interfaces to different cryptographies 
+// Cipher interfaces to different cryptographies
 type Cipher interface {
 	Encrypt([]byte) []byte
 	Decrypt([]byte) []byte
@@ -13,7 +13,7 @@ type Cipher interface {
 
 // Pbkdf1 applies a hash function, which shall be SHA-1 to derive keys
 // tools.ietf.org/html/rfc8018#section-5
-func Pbkdf1(pass, salt string, count, dkLen int) ([]byte, error){
+func Pbkdf1(pass, salt string, count, dkLen int) ([]byte, error) {
 	if dkLen > 20 {
 		return nil, errors.New("derived key too long")
 	}

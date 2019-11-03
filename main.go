@@ -23,9 +23,9 @@ func main() {
 	r := router.New()
 
 	s := server.Server{
-		Config:    cfg,
-		Router:    r,
-		Logger:    log.New(os.Stdout, "", log.Lshortfile),
+		Config: cfg,
+		Router: r,
+		Logger: log.New(os.Stdout, "", log.Lshortfile),
 	}
 
 	s.Run(ctx, 10, 10)

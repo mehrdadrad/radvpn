@@ -2,8 +2,8 @@ package router
 
 import (
 	"fmt"
-	"sync"
 	"net"
+	"sync"
 
 	"github.com/vishvananda/netlink"
 )
