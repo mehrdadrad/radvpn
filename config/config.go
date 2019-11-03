@@ -15,6 +15,7 @@ type Config struct {
 	} `yaml:"server"`
 	Crypto struct {
 		Type string `yaml:"type"`
+		Key  string `yaml:"key"`
 	} `yaml:"crypto"`
 	Nodes []struct {
 		Node `yaml:"node"`
@@ -28,10 +29,10 @@ type Config struct {
 
 // Node represents node / host IP configuration
 type Node struct {
-	Name           string   `yaml:"name"`
-	Address        string   `yaml:"address"`
-	PrivateAddress []string `yaml:"privateAddress"`
-	PrivateSubnets []string `yaml:"privateSubnets"`
+	Name             string   `yaml:"name"`
+	Address          string   `yaml:"address"`
+	PrivateAddresses []string `yaml:"privateAddresses"`
+	PrivateSubnets   []string `yaml:"privateSubnets"`
 }
 
 type source interface {
@@ -54,17 +55,16 @@ func (c *Config) Etcd() *Config {
 	return c
 }
 
-
 // Load loads configuration from file
-func (c *Config) Load() (Node, error) {
+func (c *Config) Load() error {
 	cfg, err := c.source.load()
 	if err != nil {
-		return Node{}, err
+		return err
 	}
 
 	*c = *cfg
 
-	return c.whoiam()
+	return nil
 }
 
 func (c Config) GetNodesPrivateSubnets() []string {
@@ -75,7 +75,17 @@ func (c Config) GetNodesPrivateSubnets() []string {
 	return subnets
 }
 
-func (c Config) whoiam() (Node, error) {
+// GetIRB returns information route base
+func (c Config) GetIRB() map[string][]string {
+	irb := make(map[string][]string)
+	for _, nodes := range c.Nodes {
+		irb[nodes.Node.Address] = nodes.Node.PrivateSubnets
+	}
+
+	return irb
+}
+
+func (c Config) Whoami() (Node, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
 		return Node{}, err

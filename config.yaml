@@ -1,0 +1,31 @@
+server:
+  keepalive: 10
+  insecure: false
+  mtu: 1300
+
+crypto:
+  type: gcm
+  key: 6368616e676520746869732070617373776f726420746f206120736563726574
+
+nodes:
+  - node:
+      name: node1
+      address: 192.168.55.20
+      privateAddresses: 
+        - 10.0.2.1/24
+      privateSubnets: 
+        - 10.0.2.0/24
+  - node:
+      name: node2
+      address: 192.168.55.10
+      privateAddresses: 
+        - 10.0.1.1/24
+      privateSubnets:
+        - 10.0.1.0/24
+  - node:
+      name: node3
+      address: 192.168.55.15
+      privateAddresses: 
+        - 10.0.3.1/24
+      privateSubnets:
+        - 10.0.3.0/24      
