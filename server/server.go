@@ -33,6 +33,8 @@ type Server struct {
 
 	maxWorkers int
 
+	irb map[string][]string
+
 	read  chan []byte
 	write chan []byte
 }
@@ -220,8 +222,11 @@ func (s *Server) writer(ctx context.Context, conn net.PacketConn) {
 	}
 }
 
+// UpdateRoutes updates routes
 func (s *Server) UpdateRoutes() {
 	irb := s.Config.GetIRB()
+
+	// add routes
 	for nexthop, subnets := range irb {
 		for _, subnet := range subnets {
 			_, dst, _ := net.ParseCIDR(subnet)
@@ -232,6 +237,27 @@ func (s *Server) UpdateRoutes() {
 			}
 		}
 	}
+
+	// rm routes
+	if len(s.irb) > 0 {
+		for nexthop := range irb {
+			// new host / peer / node
+			if _, ok := s.irb[nexthop]; !ok {
+				continue
+			}
+			diff := diffStrSlice(irb[nexthop], s.irb[nexthop])
+			for _, subnet := range diff {
+				_, dst, _ := net.ParseCIDR(subnet)
+				nexthop := net.ParseIP(nexthop)
+				err := s.Router.Table().Delete(dst, nexthop)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}
+	}
+
+	s.irb = irb
 }
 
 // run stars workers to read/write from tunnel
@@ -362,4 +388,21 @@ func parseHeader(b []byte) (*header, error) {
 	copy(h.dst, b[24:40])
 
 	return h, nil
+}
+
+func diffStrSlice(n, o []string) []string {
+	check := make(map[string]bool)
+	diff := []string{}
+
+	for _, k := range n {
+		check[k] = true
+	}
+
+	for _, k := range o {
+		if _, ok := check[k]; !ok {
+			diff = append(diff, k)
+		}
+	}
+
+	return diff
 }

@@ -45,11 +45,13 @@ func New() *Config {
 	return &Config{}
 }
 
+// File sets the config source to file
 func (c *Config) File() *Config {
 	c.source = &file{}
 	return c
 }
 
+// Etcd sets the config source to etcd
 func (c *Config) Etcd() *Config {
 	c.source = &etcd{}
 	return c
@@ -67,6 +69,7 @@ func (c *Config) Load() error {
 	return nil
 }
 
+// GetNodesPrivateSubnets returns all nodes private subnets
 func (c Config) GetNodesPrivateSubnets() []string {
 	var subnets []string
 	for _, nodes := range c.Nodes {
@@ -85,6 +88,7 @@ func (c Config) GetIRB() map[string][]string {
 	return irb
 }
 
+// Whoami returns current node config
 func (c Config) Whoami() (Node, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
@@ -113,10 +117,12 @@ func (c Config) Whoami() (Node, error) {
 	return Node{}, errors.New("whoami error: can not find node")
 }
 
+// GetPrivateSubnets gets the node's private subnets
 func (n Node) GetPrivateSubnets() []string {
 	return n.PrivateSubnets
 }
 
-func (n Node) GetPrivateAddress() []string {
-	return n.PrivateSubnets
+// GetPrivateAddresses gets the node's private addresses
+func (n Node) GetPrivateAddresses() []string {
+	return n.PrivateAddresses
 }
