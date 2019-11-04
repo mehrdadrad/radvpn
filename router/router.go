@@ -83,8 +83,12 @@ func (r *Routes) Delete(networkid *net.IPNet, nexthop net.IP) error {
 
 	for k, v := range r.table {
 		if v.NetworkID.String() == networkid.String() && nexthop.Equal(v.NextHop.IP) {
+			r.Lock()
+
 			r.table[k] = r.table[len(r.table)-1]
 			r.table = r.table[:len(r.table)-1]
+
+			r.Unlock()
 			routeRemoved = true
 			break
 		}
@@ -92,7 +96,7 @@ func (r *Routes) Delete(networkid *net.IPNet, nexthop net.IP) error {
 
 	if !routeRemoved {
 		return fmt.Errorf("can not delete route, not found %s", networkid.String())
-	} 
+	}
 
 	// delete route from operating system
 	ifce, err := netlink.LinkByName("radvpn")
@@ -107,7 +111,7 @@ func (r *Routes) Delete(networkid *net.IPNet, nexthop net.IP) error {
 	err = netlink.RouteDel(route)
 	if err != nil {
 		return err
-	}	
+	}
 
 	return nil
 }
