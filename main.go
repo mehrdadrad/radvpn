@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 
@@ -10,11 +11,18 @@ import (
 	"github.com/mehrdadrad/radvpn/server"
 )
 
+var configFile string
+
+func init() {
+	flag.StringVar(&configFile, "config", "", "configuration file")
+	flag.Parse()
+}
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.New().File()
+	cfg := config.New().File(configFile)
 	err := cfg.Load()
 	if err != nil {
 		log.Fatal(err)

@@ -67,10 +67,12 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 		}
 	}
 
-	s.Logger.Println(node.Name, node.PrivateAddresses)
-	SetupTunInterface(node.PrivateAddresses, s.Config.Server.Mtu)
+	err = setupTunInterface(node.PrivateAddresses, s.Config.Server.Mtu)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	s.UpdateRoutes()
+	s.updateRoutes()
 	s.Router.Table().Dump()
 
 	s.maxWorkers = maxNetWorkers
@@ -222,8 +224,8 @@ func (s *Server) writer(ctx context.Context, conn net.PacketConn) {
 	}
 }
 
-// UpdateRoutes updates routes
-func (s *Server) UpdateRoutes() {
+// updateRoutes updates routes
+func (s *Server) updateRoutes() {
 	irb := s.Config.GetIRB()
 
 	// add routes
@@ -314,8 +316,8 @@ func (t *tun) writer(ctx context.Context, ifce *water.Interface) {
 	}
 }
 
-// SetupTunInterface creates and sets tun interface attributes
-func SetupTunInterface(ipaddrs []string, mtu int) error {
+// setupTunInterface creates and sets tun interface attributes
+func setupTunInterface(ipaddrs []string, mtu int) error {
 
 	ifname := "radvpn"
 	config := water.Config{

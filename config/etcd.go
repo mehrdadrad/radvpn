@@ -10,6 +10,6 @@ func (e etcd) load() (*Config, error) {
 	return nil, nil
 }
 
-func (e etcd) watch() {
+func (e etcd) watch(chan struct{}) {
 
 }

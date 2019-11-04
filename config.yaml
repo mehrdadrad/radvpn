@@ -1,4 +1,5 @@
 server:
+  name: node1
   keepalive: 10
   insecure: false
   mtu: 1300
@@ -11,21 +12,21 @@ nodes:
   - node:
       name: node1
       address: 192.168.55.20
-      privateAddresses: 
+      privateAddresses:
         - 10.0.2.1/24
-      privateSubnets: 
+      privateSubnets:
         - 10.0.2.0/24
   - node:
       name: node2
       address: 192.168.55.10
-      privateAddresses: 
+      privateAddresses:
         - 10.0.1.1/24
       privateSubnets:
         - 10.0.1.0/24
   - node:
       name: node3
       address: 192.168.55.15
-      privateAddresses: 
+      privateAddresses:
         - 10.0.3.1/24
       privateSubnets:
-        - 10.0.3.0/24      
+        - 10.0.3.0/24

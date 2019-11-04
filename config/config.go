@@ -9,9 +9,10 @@ import (
 // Config represents configuration
 type Config struct {
 	Server struct {
-		Keepalive int  `yaml:"keepalive"`
-		Insecure  bool `yaml:"insecure"`
-		Mtu       int  `yaml:"mtu"`
+		Name      string `yaml:"name"`
+		Keepalive int    `yaml:"keepalive"`
+		Insecure  bool   `yaml:"insecure"`
+		Mtu       int    `yaml:"mtu"`
 	} `yaml:"server"`
 	Crypto struct {
 		Type string `yaml:"type"`
@@ -37,7 +38,7 @@ type Node struct {
 
 type source interface {
 	load() (*Config, error)
-	watch()
+	watch(chan struct{})
 }
 
 // New constructs new empty configuration
@@ -46,8 +47,11 @@ func New() *Config {
 }
 
 // File sets the config source to file
-func (c *Config) File() *Config {
-	c.source = &file{}
+func (c *Config) File(cfile string) *Config {
+	c.source = &file{
+		paths: []string{"/etc", "/use/local/etc"},
+		cfile: cfile,
+	}
 	return c
 }
 
@@ -90,6 +94,16 @@ func (c Config) GetIRB() map[string][]string {
 
 // Whoami returns current node config
 func (c Config) Whoami() (Node, error) {
+	// if the server name exist
+	if c.Server.Name != "" {
+		for _, nodes := range c.Nodes {
+			if nodes.Node.Name == c.Server.Name {
+				return nodes.Node, nil
+			}
+		}
+	}
+
+	// find node based on the external ip address
 	links, err := netlink.LinkList()
 	if err != nil {
 		return Node{}, err
