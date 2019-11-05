@@ -92,8 +92,6 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 	go s.run(ctx)
 
 	s.cross(ctx, t)
-
-	<-ctx.Done()
 }
 
 func (s *Server) initCrypto() error {

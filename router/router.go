@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -20,6 +21,7 @@ type NextHop struct {
 
 // Router represents router
 type Router struct {
+	ctx    context.Context
 	routes *Routes
 }
 
@@ -136,6 +138,9 @@ func (r *Routes) Dump() {
 }
 
 // New constructs a new router
-func New() *Router {
-	return &Router{new(Routes)}
+func New(ctx context.Context) *Router {
+	return &Router{
+		ctx:    ctx,
+		routes: new(Routes),
+	}
 }
