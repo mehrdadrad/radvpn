@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"errors"
+	"log"
 	"os"
 
 	"github.com/vishvananda/netlink"
@@ -34,9 +35,6 @@ type Config struct {
 	Revision int `yaml:"revision"`
 
 	source source
-
-	file file
-	etcd etcd
 }
 
 // Node represents node / host IP configuration
@@ -81,9 +79,25 @@ func (c *Config) Load() error {
 		return err
 	}
 
+	source := c.source
 	*c = *cfg
+	c.source = source
 
 	return nil
+}
+
+// Watcher reloads the configuration
+func (c Config) Watcher(extNotify chan struct{}) {
+	notify := make(chan struct{})
+	go c.source.watch(context.TODO(), notify)
+	go func(n chan struct{}) {
+		for {
+			<-notify
+			log.Println("cfg reloaded")
+			c.Load()
+			extNotify <- struct{}{}
+		}
+	}(extNotify)
 }
 
 // GetNodesPrivateSubnets returns all nodes private subnets

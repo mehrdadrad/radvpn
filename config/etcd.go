@@ -39,7 +39,7 @@ func (e *etcd) close() {
 	e.client.Close()
 }
 
-func (e etcd) load() (*Config, error) {
+func (e *etcd) load() (*Config, error) {
 	cfg, err := e.loadFromFile()
 	if err != nil {
 		return nil, err
@@ -50,6 +50,7 @@ func (e etcd) load() (*Config, error) {
 	if err := e.connect(); err != nil {
 		return nil, err
 	}
+	defer e.close()
 
 	etcdRev, err := e.getKey("/radvpn/revision")
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -158,5 +159,55 @@ func (e etcd) getKey(key string) ([]byte, error) {
 }
 
 func (e etcd) watch(ctx context.Context, notify chan struct{}) {
+	var (
+		pRev, cRev int
+		ticker     = time.NewTicker(5 * time.Second)
+	)
 
+	for {
+		e.close()
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
+
+		if err := e.connect(); err != nil {
+			log.Println(err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		revStr, err := e.getKey("/radvpn/revision")
+		if err != nil {
+			log.Println(err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		if pRev == 0 && cRev == 0 {
+			revInt, err := strconv.Atoi(string(revStr))
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			pRev, cRev = revInt, revInt
+		}
+
+		cRev, err = strconv.Atoi(string(revStr))
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		if cRev > pRev {
+			select {
+			case notify <- struct{}{}:
+				pRev = cRev
+			default:
+			}
+		}
+
+	}
 }

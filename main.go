@@ -36,16 +36,21 @@ func main() {
 	} else {
 		cfg = config.New().FromFile(configFile)
 	}
+
 	err := cfg.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	notify := make(chan struct{})
+	cfg.Watcher(notify)
 
 	r := router.New(ctx)
 
 	s := server.Server{
 		Config: cfg,
 		Router: r,
+		Notify: notify,
 		Logger: log.New(os.Stdout, "", log.Lshortfile),
 	}
 

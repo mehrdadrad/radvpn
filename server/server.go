@@ -30,6 +30,7 @@ type Server struct {
 	Router router.Gateway
 	Config *config.Config
 	Logger *log.Logger
+	Notify chan struct{}
 
 	maxWorkers int
 
