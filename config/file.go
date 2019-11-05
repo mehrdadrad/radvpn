@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -8,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type file struct {
@@ -51,16 +52,23 @@ func (f file) load() (*Config, error) {
 	return c, nil
 }
 
-func (f file) watch(notify chan struct{}) {
+func (f file) watch(ctx context.Context, notify chan struct{}) {
 	go func() {
 		stat, err := os.Stat(f.cfile)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		modTime := stat.ModTime()
 		ticker := time.NewTicker(5 * time.Second)
+
 		for {
-			<-ticker.C
+
+			select {
+			case <-ticker.C:
+			case <-ctx.Done():
+				return
+			}
 
 			stat, err := os.Stat(f.cfile)
 			if err != nil {

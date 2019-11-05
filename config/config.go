@@ -1,7 +1,9 @@
 package config
 
 import (
+	"context"
 	"errors"
+	"os"
 
 	"github.com/vishvananda/netlink"
 )
@@ -38,7 +40,7 @@ type Node struct {
 
 type source interface {
 	load() (*Config, error)
-	watch(chan struct{})
+	watch(context.Context, chan struct{})
 }
 
 // New constructs new empty configuration
@@ -94,10 +96,11 @@ func (c Config) GetIRB() map[string][]string {
 
 // Whoami returns current node config
 func (c Config) Whoami() (Node, error) {
-	// if the server name exist
-	if c.Server.Name != "" {
+	// if the server name exist at env
+	nodeName := os.Getenv("RADVPN_NODE_NAME")
+	if nodeName != "" {
 		for _, nodes := range c.Nodes {
-			if nodes.Node.Name == c.Server.Name {
+			if nodes.Node.Name == nodeName {
 				return nodes.Node, nil
 			}
 		}
