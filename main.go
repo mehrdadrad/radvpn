@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"os/signal"
 
 	"github.com/mehrdadrad/radvpn/config"
 	"github.com/mehrdadrad/radvpn/router"
@@ -22,13 +23,16 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	sig := make(chan os.Signal)
+	signal.Notify(sig, os.Interrupt, os.Kill)
+
 	cfg := config.New().File(configFile)
 	err := cfg.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	r := router.New()
+	r := router.New(ctx)
 
 	s := server.Server{
 		Config: cfg,
@@ -37,4 +41,6 @@ func main() {
 	}
 
 	s.Run(ctx, 10, 10)
+
+	<-sig
 }
