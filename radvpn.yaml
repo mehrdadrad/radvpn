@@ -1,5 +1,10 @@
+revision: 1
+etcd:
+  endpoints:
+    - localhost:2379
+  timeout: 5
+
 server:
-  name: node1
   keepalive: 10
   insecure: false
   mtu: 1300

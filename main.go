@@ -12,10 +12,15 @@ import (
 	"github.com/mehrdadrad/radvpn/server"
 )
 
-var configFile string
+var (
+	configFile string
+	etcd       bool
+	cfg        *config.Config
+)
 
 func init() {
 	flag.StringVar(&configFile, "config", "", "configuration file")
+	flag.BoolVar(&etcd, "etcd", false, "enable etcd")
 	flag.Parse()
 }
 
@@ -26,7 +31,11 @@ func main() {
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 
-	cfg := config.New().File(configFile)
+	if etcd {
+		cfg = config.New().FromEtcd(configFile)
+	} else {
+		cfg = config.New().FromFile(configFile)
+	}
 	err := cfg.Load()
 	if err != nil {
 		log.Fatal(err)

@@ -16,13 +16,22 @@ type Config struct {
 		Insecure  bool   `yaml:"insecure"`
 		Mtu       int    `yaml:"mtu"`
 	} `yaml:"server"`
+
 	Crypto struct {
 		Type string `yaml:"type"`
 		Key  string `yaml:"key"`
 	} `yaml:"crypto"`
+
 	Nodes []struct {
 		Node `yaml:"node"`
 	} `yaml:"nodes"`
+
+	Etcd struct {
+		Endpoints []string `yaml:endpoints`
+		Timeout   int      `yaml:timeout`
+	} `yaml:"etcd"`
+
+	Revision int `yaml:"revision"`
 
 	source source
 
@@ -48,8 +57,8 @@ func New() *Config {
 	return &Config{}
 }
 
-// File sets the config source to file
-func (c *Config) File(cfile string) *Config {
+// FromFile sets the config source to file
+func (c *Config) FromFile(cfile string) *Config {
 	c.source = &file{
 		paths: []string{"/etc", "/use/local/etc"},
 		cfile: cfile,
@@ -57,9 +66,11 @@ func (c *Config) File(cfile string) *Config {
 	return c
 }
 
-// Etcd sets the config source to etcd
-func (c *Config) Etcd() *Config {
-	c.source = &etcd{}
+// FromEtcd sets the config source to etcd
+func (c *Config) FromEtcd(cfile string) *Config {
+	c.source = &etcd{
+		cfile: cfile,
+	}
 	return c
 }
 
