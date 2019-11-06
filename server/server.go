@@ -357,7 +357,11 @@ func setupTunInterface(ipaddrs []string, mtu int) error {
 		return err
 	}
 
-	ifce, _ := netlink.LinkByName(ifname)
+	ifce, err := netlink.LinkByName(ifname)
+	if err != nil {
+		return err
+	}
+
 	netlink.LinkSetMTU(ifce, mtu)
 	netlink.LinkSetTxQLen(ifce, 1000)
 	netlink.LinkSetUp(ifce)
