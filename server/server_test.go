@@ -122,7 +122,7 @@ func TestParseHeader(t *testing.T) {
 	}
 }
 
-func TestCreateTunInterface(t *testing.T) {
+func testCreateTunInterface(t *testing.T) {
 	_, err := createTunInterface()
 	if err != nil {
 		t.Error("unexpected error:", err)
@@ -134,7 +134,7 @@ func TestCreateTunInterface(t *testing.T) {
 	}
 }
 
-func TestSetupTunInterface(t *testing.T) {
+func testSetupTunInterface(t *testing.T) {
 	createTunInterface()
 	setupTunInterface([]string{"10.0.1.1/24"}, 1400)
 
@@ -153,7 +153,7 @@ func TestSetupTunInterface(t *testing.T) {
 			t.Error("expected 10.0.1.1 but got,", addrs[0].IP.String())
 		}
 		if addrs[0].Mask.String() != "ffffff00" {
-			t.Error("expected ffffff00but got,", addrs[0].Mask.String())
+			t.Error("expected ffffff00 but got,", addrs[0].Mask.String())
 		}
 	} else {
 		t.Error("expected having ip address but got nothing")
