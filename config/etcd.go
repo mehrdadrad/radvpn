@@ -188,7 +188,9 @@ func (e etcd) watch(ctx context.Context, notify chan struct{}) {
 				log.Println(err)
 				continue
 			}
-			pRev, cRev = revInt, revInt
+
+			pRev = revInt
+			cRev = revInt
 		}
 
 		cRev, err = strconv.Atoi(string(revStr))
