@@ -14,12 +14,14 @@ import (
 
 var (
 	configFile string
+	update     string
 	etcd       bool
 	cfg        *config.Config
 )
 
 func init() {
 	flag.StringVar(&configFile, "config", "", "configuration file")
+	flag.StringVar(&update, "update", "", "update etc / file")
 	flag.BoolVar(&etcd, "etcd", false, "enable etcd")
 	flag.Parse()
 }
@@ -27,6 +29,14 @@ func init() {
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if update != "" {
+		err := config.UpdateConf(update, configFile)
+		if err != nil {
+			log.Println(err)
+		}
+		os.Exit(0)
+	}
 
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, os.Kill)
@@ -42,8 +52,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	notify := make(chan struct{})
-	cfg.Watcher(notify)
+	notify := make(chan struct{}, 1)
+	cfg.Watcher(ctx, notify)
 
 	r := router.New(ctx)
 
@@ -51,7 +61,6 @@ func main() {
 		Config: cfg,
 		Router: r,
 		Notify: notify,
-		Logger: log.New(os.Stdout, "", log.Lshortfile),
 	}
 
 	s.Run(ctx, 10, 10)

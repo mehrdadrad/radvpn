@@ -64,8 +64,6 @@ func (e *etcd) load() (*Config, error) {
 			return nil, err
 		}
 
-		log.Println("etcd has been updated")
-
 		return cfg, nil
 	}
 
@@ -77,7 +75,6 @@ func (e *etcd) load() (*Config, error) {
 			return nil, err
 		}
 
-		log.Println("etcd has been updated")
 		return cfg, nil
 	}
 
@@ -86,7 +83,6 @@ func (e *etcd) load() (*Config, error) {
 		return nil, err
 	}
 
-	log.Println("configuration has been fetched from etcd")
 	return cfgEtcd, nil
 }
 
@@ -104,7 +100,7 @@ func (e etcd) putConfig(cfg *Config) error {
 
 	for _, op := range ops {
 		if _, err := e.client.Do(context.TODO(), op); err != nil {
-			log.Fatal(err)
+			return err
 		}
 	}
 

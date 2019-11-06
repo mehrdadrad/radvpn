@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"io"
-	"log"
 )
 
 // GCM represents Galois/Counter Mode
@@ -15,45 +14,45 @@ type GCM struct {
 }
 
 // Encrypt encrypts the plaindata
-func (g GCM) Encrypt(plainData []byte) []byte {
+func (g GCM) Encrypt(plainData []byte) ([]byte, error) {
 	key, _ := hex.DecodeString(g.Passphrase)
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return gcm.Seal(nonce, nonce, plainData, nil)
+	return gcm.Seal(nonce, nonce, plainData, nil), nil
 }
 
 // Decrypt decrypts the cipherdata
-func (g GCM) Decrypt(cipherData []byte) []byte {
+func (g GCM) Decrypt(cipherData []byte) ([]byte, error) {
 	key, _ := hex.DecodeString(g.Passphrase)
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	nonceSize := gcm.NonceSize()
 	nonce, cipherData := cipherData[:nonceSize], cipherData[nonceSize:]
 	plainData, err := gcm.Open(nil, nonce, cipherData, nil)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return plainData
+	return plainData, nil
 }

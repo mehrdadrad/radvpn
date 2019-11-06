@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"errors"
-	"log"
 	"os"
 
 	"github.com/vishvananda/netlink"
@@ -72,6 +71,34 @@ func (c *Config) FromEtcd(cfile string) *Config {
 	return c
 }
 
+// UpdateEtcd updates etcd from file
+func (c Config) UpdateEtcd(cfile string) error {
+	e := &etcd{
+		cfile: cfile,
+	}
+
+	cfg, err := e.loadFromFile()
+	if err != nil {
+		return err
+	}
+
+	e.endpoints = cfg.Etcd.Endpoints
+
+	err = e.connect()
+	if err != nil {
+		return err
+	}
+
+	defer e.close()
+
+	err = e.putConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Load loads configuration from file
 func (c *Config) Load() error {
 	cfg, err := c.source.load()
@@ -87,13 +114,17 @@ func (c *Config) Load() error {
 }
 
 // Watcher reloads the configuration
-func (c Config) Watcher(extNotify chan struct{}) {
-	notify := make(chan struct{})
-	go c.source.watch(context.TODO(), notify)
+func (c *Config) Watcher(ctx context.Context, extNotify chan struct{}) {
+	notify := make(chan struct{}, 1)
+	go c.source.watch(ctx, notify)
 	go func(n chan struct{}) {
 		for {
-			<-notify
-			log.Println("cfg reloaded")
+			select {
+			case <-notify:
+			case <-ctx.Done():
+				return
+			}
+
 			c.Load()
 			extNotify <- struct{}{}
 		}
@@ -110,7 +141,7 @@ func (c Config) GetNodesPrivateSubnets() []string {
 }
 
 // GetIRB returns information route base
-func (c Config) GetIRB() map[string][]string {
+func (c *Config) GetIRB() map[string][]string {
 	irb := make(map[string][]string)
 	for _, nodes := range c.Nodes {
 		irb[nodes.Node.Address] = nodes.Node.PrivateSubnets
@@ -167,4 +198,19 @@ func (n Node) GetPrivateSubnets() []string {
 // GetPrivateAddresses gets the node's private addresses
 func (n Node) GetPrivateAddresses() []string {
 	return n.PrivateAddresses
+}
+
+// UpdateConf updates etcd from file and reverse
+func UpdateConf(source string, cfile string) error {
+
+	if source == "etcd" {
+		err := New().UpdateEtcd(cfile)
+		if err != nil {
+			return err
+		}
+	}
+
+	// TODO update file from etcd
+
+	return nil
 }

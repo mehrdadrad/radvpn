@@ -7,8 +7,8 @@ import (
 
 // Cipher interfaces to different cryptographies
 type Cipher interface {
-	Encrypt([]byte) []byte
-	Decrypt([]byte) []byte
+	Encrypt([]byte) ([]byte, error)
+	Decrypt([]byte) ([]byte, error)
 }
 
 // Pbkdf1 applies a hash function, which shall be SHA-1 to derive keys

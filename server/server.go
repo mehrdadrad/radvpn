@@ -29,7 +29,6 @@ type Server struct {
 	Cipher crypto.Cipher
 	Router router.Gateway
 	Config *config.Config
-	Logger *log.Logger
 	Notify chan struct{}
 
 	maxWorkers int
@@ -41,8 +40,6 @@ type Server struct {
 }
 
 type tun struct {
-	logger *log.Logger
-
 	maxWorkers int
 
 	read  chan []byte
@@ -83,7 +80,6 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 
 	t := &tun{
 		maxWorkers: maxTunWorkers,
-		logger:     s.Logger,
 	}
 
 	t.read = make(chan []byte, maxChanSize)
@@ -93,12 +89,14 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 	go s.run(ctx)
 
 	s.cross(ctx, t)
+
+	s.watcher(ctx)
 }
 
 func (s *Server) initCrypto() error {
 	switch s.Config.Crypto.Type {
 	case "gcm":
-		s.Cipher = crypto.GCM{
+		s.Cipher = &crypto.GCM{
 			Passphrase: s.Config.Crypto.Key,
 		}
 	default:
@@ -107,11 +105,30 @@ func (s *Server) initCrypto() error {
 	return nil
 }
 
-func (s Server) run(ctx context.Context) {
+func (s *Server) watcher(ctx context.Context) {
+	go func() {
+		for {
+			select {
+			case <-s.Notify:
+			case <-ctx.Done():
+				return
+			}
+
+			log.Println("updating routes and crypto key ...")
+
+			s.updateRoutes()
+			if !s.Config.Server.Insecure {
+				s.initCrypto()
+			}
+		}
+	}()
+}
+
+func (s *Server) run(ctx context.Context) {
 	for i := 0; i < s.maxWorkers; i++ {
 		conn, err := s.listenPacket(ctx)
 		if err != nil {
-			s.Logger.Fatal(err)
+			log.Fatal(err)
 
 		}
 
@@ -175,12 +192,16 @@ func (s *Server) reader(ctx context.Context, conn net.PacketConn) {
 		b := make([]byte, maxBufSize)
 		n, _, err := conn.ReadFrom(b)
 		if err != nil {
-			s.Logger.Println(err)
+			log.Println(err)
 			continue
 		}
 
 		if !s.Config.Server.Insecure {
-			b = s.Cipher.Decrypt(b[:n])
+			b, err = s.Cipher.Decrypt(b[:n])
+			if err != nil {
+				log.Println(err)
+				continue
+			}
 		}
 
 		select {
@@ -198,7 +219,7 @@ func (s *Server) writer(ctx context.Context, conn net.PacketConn) {
 		case b := <-s.write:
 			h, err := parseHeader(b)
 			if err != nil {
-				s.Logger.Println(err)
+				log.Println(err)
 				continue
 			}
 
@@ -208,7 +229,11 @@ func (s *Server) writer(ctx context.Context, conn net.PacketConn) {
 					net.JoinHostPort(nexthop.String(), "8085"))
 
 				if !s.Config.Server.Insecure {
-					b = s.Cipher.Encrypt(b)
+					b, err = s.Cipher.Encrypt(b)
+					if err != nil {
+						log.Println(err)
+						continue
+					}
 				}
 
 				_, err = conn.WriteTo(b, rAddr)
@@ -269,7 +294,7 @@ func (t tun) run(ctx context.Context) {
 	for i := 0; i < t.maxWorkers; i++ {
 		ifce, err := createTunInterface()
 		if err != nil {
-			t.logger.Fatal(err)
+			log.Fatal(err)
 		}
 		go t.reader(ctx, ifce)
 		go t.writer(ctx, ifce)
@@ -284,7 +309,7 @@ func (t *tun) reader(ctx context.Context, ifce *water.Interface) {
 		b := make([]byte, maxBufSize)
 		n, err := ifce.Read(b)
 		if err != nil {
-			t.logger.Println(err)
+			log.Println(err)
 		}
 
 		select {
@@ -306,7 +331,7 @@ func (t *tun) writer(ctx context.Context, ifce *water.Interface) {
 		case b = <-t.write:
 			_, err := ifce.Write(b)
 			if err != nil {
-				t.logger.Println(err)
+				log.Println(err)
 			}
 
 		case <-ctx.Done():
