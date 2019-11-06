@@ -13,8 +13,9 @@ import (
 )
 
 type file struct {
-	paths []string
-	cfile string
+	paths      []string
+	cfile      string
+	watchDelay int
 }
 
 func (f file) load() (*Config, error) {
@@ -59,8 +60,12 @@ func (f file) watch(ctx context.Context, notify chan struct{}) {
 			log.Fatal(err)
 		}
 
+		if f.watchDelay == 0 {
+			f.watchDelay = 5
+		}
+
 		modTime := stat.ModTime()
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(time.Duration(f.watchDelay) * time.Second)
 
 		for {
 

@@ -57,8 +57,9 @@ func New() *Config {
 // FromFile sets the config source to file
 func (c *Config) FromFile(cfile string) *Config {
 	c.source = &file{
-		paths: []string{"/etc", "/use/local/etc"},
-		cfile: cfile,
+		paths:      []string{"/etc", "/use/local/etc"},
+		cfile:      cfile,
+		watchDelay: 5,
 	}
 	return c
 }
