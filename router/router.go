@@ -43,9 +43,7 @@ type Routes struct {
 	table []Route
 }
 
-// Add appends a new route to table and operating system
-func (r *Routes) Add(networkid *net.IPNet, nexthop net.IP) error {
-	// check if route exist
+func (r *Routes) addToRouter(networkid *net.IPNet, nexthop net.IP) error {
 	for _, route := range r.table {
 		if nexthop.Equal(route.NextHop.IP) && networkid.String() == route.NetworkID.String() {
 			return fmt.Errorf("route exist %s %s", networkid, nexthop)
@@ -61,7 +59,10 @@ func (r *Routes) Add(networkid *net.IPNet, nexthop net.IP) error {
 
 	r.Unlock()
 
-	// add route to operating system
+	return nil
+}
+
+func (r *Routes) addToHost(networkid *net.IPNet, nexthop net.IP) error {
 	ifce, err := netlink.LinkByName("radvpn")
 	if err != nil {
 		return err
@@ -71,16 +72,20 @@ func (r *Routes) Add(networkid *net.IPNet, nexthop net.IP) error {
 		Dst:       networkid,
 		LinkIndex: ifce.Attrs().Index,
 	}
-	err = netlink.RouteAdd(route)
+	return netlink.RouteAdd(route)
+}
+
+// Add appends a new route to table and operating system
+func (r *Routes) Add(networkid *net.IPNet, nexthop net.IP) error {
+	err := r.addToRouter(networkid, nexthop)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return r.addToHost(networkid, nexthop)
 }
 
-// Delete removes a route from table and operating system
-func (r *Routes) Delete(networkid *net.IPNet, nexthop net.IP) error {
+func (r *Routes) delFromRouter(networkid *net.IPNet, nexthop net.IP) error {
 	var routeRemoved bool
 
 	for k, v := range r.table {
@@ -100,7 +105,10 @@ func (r *Routes) Delete(networkid *net.IPNet, nexthop net.IP) error {
 		return fmt.Errorf("can not delete route, not found %s", networkid.String())
 	}
 
-	// delete route from operating system
+	return nil
+}
+
+func (r *Routes) delFromHost(networkid *net.IPNet, nexthop net.IP) error {
 	ifce, err := netlink.LinkByName("radvpn")
 	if err != nil {
 		return err
@@ -110,12 +118,19 @@ func (r *Routes) Delete(networkid *net.IPNet, nexthop net.IP) error {
 		Dst:       networkid,
 		LinkIndex: ifce.Attrs().Index,
 	}
-	err = netlink.RouteDel(route)
+
+	return netlink.RouteDel(route)
+}
+
+// Delete removes a route from table and operating system
+func (r *Routes) Delete(networkid *net.IPNet, nexthop net.IP) error {
+
+	err := r.delFromRouter(networkid, nexthop)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return r.delFromHost(networkid, nexthop)
 }
 
 // Get returns nexthop for a specific dest.
