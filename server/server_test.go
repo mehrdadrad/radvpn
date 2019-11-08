@@ -125,7 +125,7 @@ func TestParseHeader(t *testing.T) {
 	}
 }
 
-func TestCreateTunInterface(t *testing.T) {
+func testCreateTunInterface(t *testing.T) {
 	_, err := createTunInterface()
 	if err != nil {
 		t.Error("unexpected error:", err)
@@ -137,7 +137,7 @@ func TestCreateTunInterface(t *testing.T) {
 	}
 }
 
-func TestSetupTunInterface(t *testing.T) {
+func testSetupTunInterface(t *testing.T) {
 	createTunInterface()
 	setupTunInterface([]string{"10.0.1.1/24"}, 1400)
 

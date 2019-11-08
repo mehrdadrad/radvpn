@@ -229,4 +229,12 @@ func setDefaultConfig(c *Config) {
 	if c.Server.MaxWorkers == 0 {
 		c.Server.MaxWorkers = 10
 	}
+
+	if c.Server.Keepalive == 0 {
+		c.Server.Keepalive = 10
+	}
+
+	if c.Server.Mtu == 0 {
+		c.Server.Mtu = 1300
+	}
 }
