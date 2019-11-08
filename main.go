@@ -63,7 +63,7 @@ func main() {
 		Notify: notify,
 	}
 
-	s.Run(ctx, 10, 10)
+	s.Run(ctx)
 
 	<-sig
 }

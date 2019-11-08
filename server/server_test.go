@@ -25,7 +25,7 @@ func TestInitCrypto(t *testing.T) {
 
 	err := s.initCrypto()
 	if err != nil {
-		t.Error("expect err nil but got,", err)
+		t.Error("expected err nil but got,", err)
 	}
 
 	cfg = &config.Config{
@@ -41,7 +41,7 @@ func TestInitCrypto(t *testing.T) {
 
 	err = s.initCrypto()
 	if err == nil {
-		t.Error("expect to have err but got nil")
+		t.Error("expected to have err but got nil")
 	}
 }
 

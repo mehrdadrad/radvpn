@@ -31,8 +31,6 @@ type Server struct {
 	Config *config.Config
 	Notify chan struct{}
 
-	maxWorkers int
-
 	irb map[string][]string
 
 	read  chan []byte
@@ -53,7 +51,7 @@ type header struct {
 }
 
 // Run stars workers
-func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
+func (s Server) Run(ctx context.Context) {
 	node, err := s.Config.Whoami()
 	if err != nil {
 		log.Fatal(err)
@@ -65,6 +63,8 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 		}
 	}
 
+	log.Println("address:", s.Config.Server.Address)
+
 	err = setupTunInterface(node.PrivateAddresses, s.Config.Server.Mtu)
 	if err != nil {
 		log.Fatal(err)
@@ -73,13 +73,11 @@ func (s Server) Run(ctx context.Context, maxTunWorkers, maxNetWorkers int) {
 	s.updateRoutes()
 	s.Router.Table().Dump()
 
-	s.maxWorkers = maxNetWorkers
-
 	s.read = make(chan []byte, maxChanSize)
 	s.write = make(chan []byte, maxChanSize)
 
 	t := &tun{
-		maxWorkers: maxTunWorkers,
+		maxWorkers: s.Config.Server.MaxWorkers,
 	}
 
 	t.read = make(chan []byte, maxChanSize)
@@ -125,7 +123,7 @@ func (s *Server) watcher(ctx context.Context) {
 }
 
 func (s *Server) run(ctx context.Context) {
-	for i := 0; i < s.maxWorkers; i++ {
+	for i := 0; i < s.Config.Server.MaxWorkers; i++ {
 		conn, err := s.listenPacket(ctx)
 		if err != nil {
 			log.Fatal(err)
@@ -184,7 +182,7 @@ func (s Server) listenPacket(ctx context.Context) (net.PacketConn, error) {
 		KeepAlive: time.Duration(s.Config.Server.Keepalive) * time.Second,
 	}
 
-	return lc.ListenPacket(ctx, "udp", ":8085")
+	return lc.ListenPacket(ctx, "udp", s.Config.Server.Address)
 }
 
 func (s *Server) reader(ctx context.Context, conn net.PacketConn) {
@@ -214,6 +212,11 @@ func (s *Server) reader(ctx context.Context, conn net.PacketConn) {
 }
 
 func (s *Server) writer(ctx context.Context, conn net.PacketConn) {
+	_, port, err := net.SplitHostPort(s.Config.Server.Address)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for {
 		select {
 		case b := <-s.write:
@@ -226,7 +229,7 @@ func (s *Server) writer(ctx context.Context, conn net.PacketConn) {
 			nexthop := s.Router.Table().Get(h.dst)
 			if nexthop != nil {
 				rAddr, _ := net.ResolveUDPAddr("udp",
-					net.JoinHostPort(nexthop.String(), "8085"))
+					net.JoinHostPort(nexthop.String(), port))
 
 				if !s.Config.Server.Insecure {
 					b, err = s.Cipher.Encrypt(b)

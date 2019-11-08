@@ -11,10 +11,12 @@ import (
 // Config represents configuration
 type Config struct {
 	Server struct {
-		Name      string `yaml:"name"`
-		Keepalive int    `yaml:"keepalive"`
-		Insecure  bool   `yaml:"insecure"`
-		Mtu       int    `yaml:"mtu"`
+		Name       string `yaml:"name"`
+		Address    string `yaml:"address"`
+		MaxWorkers int    `yaml:"maxworkers"`
+		Keepalive  int    `yaml:"keepalive"`
+		Insecure   bool   `yaml:"insecure"`
+		Mtu        int    `yaml:"mtu"`
 	} `yaml:"server"`
 
 	Crypto struct {
@@ -100,7 +102,7 @@ func (c Config) UpdateEtcd(cfile string) error {
 	return nil
 }
 
-// Load loads configuration from file
+// Load loads configuration from file / etcd
 func (c *Config) Load() error {
 	cfg, err := c.source.load()
 	if err != nil {
@@ -110,6 +112,8 @@ func (c *Config) Load() error {
 	source := c.source
 	*c = *cfg
 	c.source = source
+
+	setDefaultConfig(c)
 
 	return nil
 }
@@ -214,4 +218,15 @@ func UpdateConf(source string, cfile string) error {
 	// TODO update file from etcd
 
 	return nil
+}
+
+func setDefaultConfig(c *Config) {
+	// set defaults
+	if c.Server.Address == "" {
+		c.Server.Address = ":8085"
+	}
+
+	if c.Server.MaxWorkers == 0 {
+		c.Server.MaxWorkers = 10
+	}
 }
