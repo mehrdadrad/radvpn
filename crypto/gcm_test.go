@@ -7,6 +7,8 @@ func TestCryptoGCM(t *testing.T) {
 		Passphrase: "6368616e676520746869732070617373776f726420746f206120736563726574",
 	}
 
+	crp.Init()
+
 	msg := "decentralized vpn"
 
 	emsg, err := crp.Encrypt([]byte(msg))

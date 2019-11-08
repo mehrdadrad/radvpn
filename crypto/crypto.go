@@ -9,6 +9,7 @@ import (
 type Cipher interface {
 	Encrypt([]byte) ([]byte, error)
 	Decrypt([]byte) ([]byte, error)
+	Init()
 }
 
 // Pbkdf1 applies a hash function, which shall be SHA-1 to derive keys

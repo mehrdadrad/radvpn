@@ -11,12 +11,17 @@ import (
 // GCM represents Galois/Counter Mode
 type GCM struct {
 	Passphrase string
+	key        []byte
+}
+
+// Init initializes the key based on the passphrase
+func (g *GCM) Init() {
+	g.key, _ = hex.DecodeString(g.Passphrase)
 }
 
 // Encrypt encrypts the plaindata
 func (g GCM) Encrypt(plainData []byte) ([]byte, error) {
-	key, _ := hex.DecodeString(g.Passphrase)
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(g.key)
 	if err != nil {
 		return nil, err
 	}
@@ -36,8 +41,7 @@ func (g GCM) Encrypt(plainData []byte) ([]byte, error) {
 
 // Decrypt decrypts the cipherdata
 func (g GCM) Decrypt(cipherData []byte) ([]byte, error) {
-	key, _ := hex.DecodeString(g.Passphrase)
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(g.key)
 	if err != nil {
 		return nil, err
 	}

@@ -97,6 +97,12 @@ func (s *Server) initCrypto() error {
 		s.Cipher = &crypto.GCM{
 			Passphrase: s.Config.Crypto.Key,
 		}
+		s.Cipher.Init()
+	case "cbc":
+		s.Cipher = &crypto.CBC{
+			Passphrase: s.Config.Crypto.Key,
+		}
+		s.Cipher.Init()
 	default:
 		return errors.New("crypto not support")
 	}
