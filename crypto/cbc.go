@@ -22,7 +22,7 @@ func (c *CBC) Init() {
 }
 
 // Encrypt encrypts the plaindat
-func (c *CBC) Encrypt(plainData []byte) ([]byte, error) {
+func (c CBC) Encrypt(plainData []byte) ([]byte, error) {
 	if len(plainData)%aes.BlockSize != 0 {
 		plainData = padding(plainData)
 	}
@@ -45,7 +45,7 @@ func (c *CBC) Encrypt(plainData []byte) ([]byte, error) {
 }
 
 // Decrypt decrypts the cipherdat
-func (c *CBC) Decrypt(cipherData []byte) ([]byte, error) {
+func (c CBC) Decrypt(cipherData []byte) ([]byte, error) {
 	block, err := aes.NewCipher(c.key)
 	if err != nil {
 		return nil, err
