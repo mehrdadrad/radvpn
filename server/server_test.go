@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/mehrdadrad/radvpn/config"
 
@@ -122,6 +123,41 @@ func TestParseHeader(t *testing.T) {
 
 	if h.dst.String() != "192.229.150.190" {
 		t.Error("expected 192.229.150.190 but got,", h.src)
+	}
+}
+
+func TestCross(t *testing.T) {
+	s := &Server{
+		read:  make(chan []byte, 2),
+		write: make(chan []byte, 2),
+	}
+
+	tu := &tun{
+		read:  make(chan []byte, 2),
+		write: make(chan []byte, 2),
+	}
+
+	s.cross(context.Background(), tu)
+
+	var a []byte
+	s.read <- []byte("vpn")
+	select {
+	case a = <-tu.write:
+	case <-time.After(1 * time.Millisecond):
+	}
+
+	if string(a) != "vpn" {
+		t.Error("expected to have vpn but got,", string(a))
+	}
+
+	tu.read <- []byte("decentralized")
+	select {
+	case a = <-s.write:
+	case <-time.After(1 * time.Millisecond):
+	}
+
+	if string(a) != "decentralized" {
+		t.Error("expected to have decentralized but got,", string(a))
 	}
 }
 
