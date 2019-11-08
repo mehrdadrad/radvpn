@@ -18,15 +18,13 @@ go build .
 docker run --privileged -d -p 8085:8085 -v $(pwd)/radvpn.yaml:/etc/radvpn.yaml -e RADVPN_NODE_NAME=node1 radvp
 ```
 
-## Config
+## Basic Config
 With the default it tries to load config.yaml file indivitually at each node but can be configured to use same configuration through [etcd](https://github.com/etcd-io/etcd). once the configuration changed, it loads and applies new changes by itself. the below yaml is a simple configuration.
+
+![Alt text](/docs/imgs/simpleconfig.png?raw=true "radvpn")
+
 ```yaml
 revision: 1
-
-server:
-  keepalive: 10
-  insecure: false
-  mtu: 1300
 
 crypto:
   type: gcm
@@ -35,18 +33,18 @@ crypto:
 nodes:
   - node:
       name: node1
-      address: 192.168.55.20
-      privateAddresses:
-        - 10.0.2.1/24
-      privateSubnets:
-        - 10.0.2.0/24
-  - node:
-      name: node2
-      address: 192.168.55.10
+      address: 8.121.55.10
       privateAddresses:
         - 10.0.1.1/24
       privateSubnets:
-        - 10.0.1.0/24        
+        - 10.0.1.0/24
+  - node:
+      name: node2
+      address: 84.12.92.45
+      privateAddresses:
+        - 10.0.2.1/24
+      privateSubnets:
+        - 10.0.2.0/24        
 ```
 
 ## License
