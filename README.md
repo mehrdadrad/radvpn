@@ -47,6 +47,30 @@ nodes:
         - 10.0.2.0/24        
 ```
 
+### Configuration
+- revision - the watcher works based on the revision number once it increased, the configuration will be loaded immediatly
+- server
+  - keepalive - frequency duration of radvpn-to-radvpn ping to check if a connection is alive (default is 10 seconds)
+  - insecure - disable /enable encryption (default is false)
+  - mtu - sets the mtu of the tunnel interface
+  - maxworkers - sets number of concurrent workers (read/write to/from tunnel concurrently) 
+  - address - sets ip address and ports (format : ip:port)
+  - name - sets the name of the current node 
+- crypto
+  - type
+     - gcm - galois/counter mode
+     - cbc - cipher block chaining
+  - key - secret key
+- etcd
+  - endpoints - sets the etcd endpoints
+  - timeout - sets etcd endpoints timeout
+- nodes
+  - node
+     - name - node's name 
+     - address - node's external ip address
+     - privateAddresses - sets private address(es) on the tunnel interface
+     - privateSubnets - sets reachable subnet(s) from currect node
+
 ## License
 This project is licensed under MIT license. Please read the LICENSE file.
 
