@@ -47,7 +47,7 @@ nodes:
         - 10.0.2.0/24        
 ```
 
-### Configuration
+### Configuration keys
 - revision - the watcher works based on the revision number once it increased, the configuration will be loaded immediatly
 - server
   - keepalive - frequency duration of radvpn-to-radvpn ping to check if a connection is alive (default is 10 seconds)
@@ -70,6 +70,10 @@ nodes:
      - address - node's external ip address
      - privateAddresses - sets private address(es) on the tunnel interface
      - privateSubnets - sets reachable subnet(s) from currect node
+
+
+### Configuration with [etcd](https://github.com/etcd-io/etcd)
+![Alt text](/docs/imgs/radvpnetcd.png?raw=true "radvpn etcd")
 
 ## License
 This project is licensed under MIT license. Please read the LICENSE file.
