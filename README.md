@@ -46,6 +46,10 @@ nodes:
       privateSubnets:
         - 10.0.2.0/24        
 ```
+### Run
+```
+#radvpn -config radvpn.conf 
+```
 
 ### Configuration keys
 - revision - the watcher works based on the revision number once it increased, the configuration will be loaded immediatly
@@ -74,6 +78,16 @@ nodes:
 
 ### Configuration with [etcd](https://github.com/etcd-io/etcd)
 ![Alt text](/docs/imgs/radvpnetcd.png?raw=true "radvpn etcd")
+
+[sample configuration](https://github.com/mehrdadrad/radvpn/blob/master/radvpn.yaml)
+#### Run with etcd
+```
+#radvpn -config radvpn.conf -etcd
+```
+#### Update etcd from yaml file
+```
+#radvpn -update etcd -config radvpn.yaml
+```
 
 ## License
 This project is licensed under MIT license. Please read the LICENSE file.
