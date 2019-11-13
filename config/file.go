@@ -18,7 +18,7 @@ type file struct {
 	watchDelay int
 }
 
-func (f file) load() (*Config, error) {
+func (f *file) load() (*Config, error) {
 	configFile := ""
 
 	if f.cfile != "" {
