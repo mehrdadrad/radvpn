@@ -15,7 +15,8 @@ go build .
 
 ## Docker
 ```bash
-docker run --privileged -d -p 8085:8085 -v $(pwd)/radvpn.yaml:/etc/radvpn.yaml -e RADVPN_NODE_NAME=node1 radvp
+docker pull mehrdadrad/radvpn:latest
+docker run --privileged -d -p 8085:8085 -v $(pwd)/radvpn.yaml:/etc/radvpn.yaml -e RADVPN_NODE_NAME=node1 mehrdadrad/radvpn:latest
 ```
 
 ## Basic Config
