@@ -5,6 +5,8 @@
 
 ![Alt text](/docs/imgs/radvpn.png?raw=true "radvpn")
 
+The RadVPN doesn't need any central point as it connects to other nodes directly (full mesh) it has built-in router that helps packets to route to the approperate destinations. there are two options for configuration: yaml file and if you want to have central configuration management it supports [etcd](https://github.com/etcd-io/etcd). for the time being it support symmetric encryptions and Linux platform.
+
 ## Build
 Given that the Go Language compiler (version 1.11 or greater is required) is installed, you can build it with:
 ```bash
