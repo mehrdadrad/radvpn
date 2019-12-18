@@ -38,7 +38,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	sig := make(chan os.Signal)
+	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 
 	if etcd {
