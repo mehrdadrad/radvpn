@@ -10,7 +10,7 @@ The RadVPN doesn't need any central point as it connects to other nodes directly
 ## Build
 Given that the Go Language compiler (version 1.11 or greater is required) is installed, you can build it with:
 ```bash
-go get https://github.com/mehrdadrad/radvpn
+go get github.com/mehrdadrad/radvpn
 cd $GOPATH/src/github.com/mehrdadrad/radvpn
 go build .
 ```
